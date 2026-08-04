@@ -4,7 +4,9 @@
 
 ## Estado
 
-**Foundation Build v1.0 — especificación y arquitectura en construcción.**
+**Foundation Build v1.0 — Biblia estructural cerrada y lista para implementación con Codex.**
+
+La arquitectura, los contratos, la seguridad, el alcance, el diseño, la operación y los criterios de aceptación ya están documentados. La implementación del servidor todavía no comenzó.
 
 Este repositorio es la única fuente de verdad de ALSEMA AI CORE. Contendrá la documentación fundacional, la arquitectura, el backend, el frontend, los proveedores de IA, los agentes, las herramientas, los plugins, los workflows, la memoria, la seguridad, las pruebas y el despliegue.
 
@@ -14,7 +16,7 @@ ALSEMA AI CORE es una plataforma local de inteligencia artificial diseñada para
 
 El Core no contiene lógica propia de Cometa G, InstaNews, CreativoSur, CanastApp, Peak, MascotApps ni de ninguna otra unidad de negocio. Esas soluciones serán clientes externos que consumirán las APIs, SDKs, eventos y plugins publicados por esta plataforma.
 
-El proveedor inicial de modelos será Ollama. La arquitectura deberá admitir otros proveedores mediante adaptadores, sin modificar los agentes, workflows ni clientes.
+El proveedor inicial de modelos será Ollama. La arquitectura admite otros proveedores mediante adaptadores, sin modificar agentes, workflows ni clientes.
 
 ## Qué no es
 
@@ -29,7 +31,8 @@ El proveedor inicial de modelos será Ollama. La arquitectura deberá admitir ot
 
 La primera versión funcional debe entregar una base real y ejecutable con:
 
-- API REST versionada y WebSocket para streaming.
+- API REST versionada.
+- Streaming mediante Server-Sent Events.
 - Autenticación y administración inicial.
 - Interfaz web oscura, sobria y profesional.
 - Chat operativo mediante Ollama.
@@ -43,9 +46,9 @@ La primera versión funcional debe entregar una base real y ejecutable con:
 - Memoria persistente básica con separación por ámbito.
 - PostgreSQL, Redis y migraciones.
 - Docker Compose para desarrollo y operación local.
-- Pruebas automáticas y documentación de API.
+- Pruebas automáticas y documentación OpenAPI.
 
-Las integraciones empresariales, redes sociales, Google Sheets, generación de audio, imágenes, video y 3D quedarán fuera de esta primera implementación. Deben estar previstas por contratos estables, pero no simuladas con código superficial.
+Las integraciones empresariales, redes sociales, Google Sheets, generación de audio, imágenes, video y 3D quedan fuera de esta primera implementación. Están previstas mediante contratos extensibles, pero no deben simularse con código superficial.
 
 ## Principios
 
@@ -57,12 +60,10 @@ Las integraciones empresariales, redes sociales, Google Sheets, generación de a
 6. **Observabilidad:** toda tarea importante debe poder rastrearse.
 7. **Recuperación:** los trabajos largos deben reanudarse o reintentarse sin perder estado.
 8. **Evolución incremental:** cada fase debe dejar el sistema ejecutable.
-9. **Nada de arquitectura vacía:** una interfaz existe solo cuando tiene un uso concreto en la versión actual o una extensión claramente documentada.
+9. **Nada de arquitectura vacía:** una interfaz existe solo cuando tiene un uso concreto o una extensión documentada.
 10. **Documentación como código:** las decisiones relevantes viven versionadas en este repositorio.
 
 ## Diseño visual
-
-La identidad visual será oscura, limpia y sobria:
 
 - Fondo principal: `#0B0B0B`
 - Superficies: `#141414`
@@ -74,20 +75,28 @@ La identidad visual será oscura, limpia y sobria:
 
 El cian se utilizará con moderación para estados activos, foco, enlaces y métricas relevantes. No se utilizarán degradados chillones, estética gamer ni neón excesivo.
 
-## Documentación fundacional
+## Entrada para Codex
 
-La carpeta `docs/` contendrá inicialmente:
+Abrir el repositorio en Codex y utilizar:
 
-- `00_MANIFESTO.md`
-- `01_MAKEBUILD.md`
-- `02_ARCHITECTURE.md`
-- `03_SCOPE_AND_ACCEPTANCE.md`
-- `04_DOMAIN_MODEL.md`
-- `05_SECURITY_MODEL.md`
-- `06_API_CONVENTIONS.md`
-- `07_DESIGN_SYSTEM.md`
-- `08_ROADMAP.md`
-- `adr/` para decisiones de arquitectura.
+```text
+Lee CODEX_MASTER_PROMPT.md y ejecutalo íntegramente. Antes de implementar, lee la documentación en el orden definido por docs/29_DOCUMENT_INDEX.md. Trabaja de forma autónoma por fases, ejecuta pruebas y no declares una fase terminada sin evidencia.
+```
+
+El archivo `CODEX_MASTER_PROMPT.md` es la instrucción ejecutiva. La carpeta `docs/` es la especificación autoritativa.
+
+## Orden mínimo de lectura
+
+1. `README.md`
+2. `CODEX_MASTER_PROMPT.md`
+3. `docs/29_DOCUMENT_INDEX.md`
+4. `docs/00_MANIFESTO.md`
+5. `docs/01_MAKEBUILD.md`
+6. `docs/02_ARCHITECTURE.md`
+7. `docs/03_SCOPE_AND_ACCEPTANCE.md`
+8. ADRs aceptados
+
+En caso de contradicción, aplicar la precedencia definida en `docs/29_DOCUMENT_INDEX.md`.
 
 ## Stack objetivo inicial
 
@@ -103,7 +112,7 @@ La carpeta `docs/` contendrá inicialmente:
 - ARQ
 - HTTPX
 - JWT con rotación de refresh tokens
-- WebSockets o Server-Sent Events según el caso de uso
+- Server-Sent Events
 
 ### Frontend
 
@@ -127,39 +136,16 @@ La carpeta `docs/` contendrá inicialmente:
 - pre-commit
 - GitHub Actions
 
-## Arranque esperado
-
-Cuando el Foundation Build esté terminado:
+## Arranque esperado al finalizar la implementación
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-La plataforma deberá exponer:
-
-- Frontend web
-- API
-- Documentación OpenAPI
-- PostgreSQL
-- Redis
-- Worker de tareas
-- Estado de conexión con Ollama
+La plataforma deberá exponer frontend, API, documentación OpenAPI, PostgreSQL, Redis, worker de tareas y estado de conexión con Ollama.
 
 La descarga de modelos será una acción explícita del administrador. El sistema no descargará modelos de gran tamaño sin autorización.
-
-## Regla principal para Codex
-
-Antes de implementar, leer en este orden:
-
-1. `README.md`
-2. `docs/00_MANIFESTO.md`
-3. `docs/01_MAKEBUILD.md`
-4. `docs/02_ARCHITECTURE.md`
-5. `docs/03_SCOPE_AND_ACCEPTANCE.md`
-6. ADRs vigentes
-
-En caso de contradicción, prevalece el documento más específico y luego la decisión ADR más reciente aceptada.
 
 ## Licencia
 
