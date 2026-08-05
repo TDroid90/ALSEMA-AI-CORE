@@ -14,7 +14,8 @@ Antes de modificar código:
 2. Leé `docs/29_DOCUMENT_INDEX.md`.
 3. Leé todos los documentos en el orden indicado.
 4. Leé todos los ADR vigentes.
-5. Inspeccioná completamente el repositorio y su estado Git.
+5. Leé `docs/30_PLUGIN_EXECUTION_ISOLATION.md` antes de implementar plugins o herramientas ejecutables.
+6. Inspeccioná completamente el repositorio y su estado Git.
 
 La documentación es autoritativa. No reemplaces decisiones explícitas por preferencias personales.
 
@@ -65,12 +66,15 @@ Cuando aparezca una contradicción real:
 - No usar TODOs como sustituto de implementación.
 - No hardcodear secretos ni rutas del equipo del usuario.
 - No descargar modelos automáticamente.
-- No introducir microservicios.
+- No introducir microservicios, salvo el `plugin-runner` interno autorizado exclusivamente para aislamiento de ejecución.
 - No acoplar agentes o workflows a Ollama.
 - No ejecutar herramientas riesgosas sin permisos y aprobación.
 - No declarar una fase terminada con tests fallando.
 - No borrar documentación fundacional.
 - No modificar una decisión arquitectónica sin ADR.
+- No montar `/var/run/docker.sock` en el backend principal.
+- No usar `privileged: true` para plugins o runners.
+- No permitir imágenes, mounts, secretos, variables ni opciones Docker arbitrarias aportadas por el usuario.
 
 ## Estrategia de ejecución
 
@@ -150,7 +154,7 @@ Debe arrancar antes de avanzar.
 - cancelación;
 - recuperación tras reinicio.
 
-### Fase 7 — Plugins y herramientas
+### Fase 7 — Plugins, herramientas y aislamiento
 
 Implementar realmente:
 
@@ -160,7 +164,18 @@ Implementar realmente:
 - contratos SDK;
 - permisos;
 - activar/desactivar;
-- healthcheck.
+- healthcheck;
+- interfaz `PluginExecutionRuntime`;
+- runtime `in_process` solo para plugins internos confiables y desactivado por defecto en producción;
+- runtime `docker_sandbox` para Python, shell y código externo;
+- servicio interno `plugin-runner` o equivalente;
+- contenedores efímeros no root, sin red por defecto, con filesystem de solo lectura y límites de CPU, RAM, procesos y tiempo;
+- eliminación automática de contenedores y workspaces temporales;
+- captura de stdout, stderr, código de salida, duración y auditoría;
+- allowlist explícita de imágenes y acceso de red;
+- tests de aislamiento y modelo de amenazas.
+
+Cumplí íntegramente `docs/30_PLUGIN_EXECUTION_ISOLATION.md`.
 
 ### Fase 8 — Workflows
 
@@ -229,6 +244,7 @@ chore: bootstrap development environment
 feat: add authentication and initial setup
 feat: implement ollama provider adapter
 feat: add durable task execution
+feat: add isolated plugin execution runtime
 feat: implement foundation workflow nodes
 test: add end to end acceptance coverage
 docs: complete implementation traceability
