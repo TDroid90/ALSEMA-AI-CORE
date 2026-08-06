@@ -13,6 +13,12 @@ from app.api.tools import validate_http_destination
 from app.config.settings import get_settings
 from app.modules.agents.models import Agent, AgentVersion
 from app.modules.identity.audit import record_audit
+from app.modules.plugins.facebook import (
+    FacebookAPIError,
+    FacebookPublisherPlugin,
+    credentials_for_facebook_account,
+)
+from app.modules.plugins.facebook_models import FacebookAccount, FacebookPublication
 from app.modules.plugins.instagram import (
     InstagramAPIError,
     InstagramPublisherPlugin,
@@ -131,7 +137,12 @@ async def prepare_instagram_media(
                 task.progress_current = 1
                 task.progress_message = "Creando contenedor de imagen"
                 await session.commit()
-                created = await plugin.create_image_container(credentials, publication.image_url, publication.caption)
+                created = await plugin.create_image_container(
+                    credentials,
+                    publication.image_url,
+                    publication.caption,
+                    publication.placement,
+                )
                 container_id = created.get("id")
                 if not isinstance(container_id, str) or not container_id:
                     raise InstagramAPIError("Instagram no devolvió el identificador del contenedor.")
@@ -150,12 +161,41 @@ async def prepare_instagram_media(
                 if status_code == "FINISHED":
                     task.status = publication.status = "ready"
                     task.progress_current = 3
-                    task.progress_message = "Contenedor listo; requiere confirmación humana"
+                    task.progress_message = (
+                        "Contenedor listo; publicación automática en cola"
+                        if account.auto_publish
+                        else "Contenedor listo; requiere confirmación humana"
+                    )
                     task.completed_at = datetime.now(UTC)
                     publication.ready_at = datetime.now(UTC)
                     publication.error = None
                     await record_audit(session, publication.requested_by_user_id, "instagram.container.ready", "instagram_publication", str(publication.id), {"container_id": publication.container_id})
+                    publish_task: Task | None = None
+                    if account.auto_publish:
+                        publish_task = Task(
+                            type="instagram.media.publish",
+                            owner_user_id=publication.requested_by_user_id,
+                            status="queued",
+                            progress_message="Publicación automática en cola",
+                            result=str(publication.id),
+                        )
+                        session.add(publish_task)
+                        await session.flush()
+                        await record_audit(
+                            session,
+                            publication.requested_by_user_id,
+                            "instagram.publish.automatic",
+                            "instagram_publication",
+                            str(publication.id),
+                            {"container_id": publication.container_id},
+                        )
                     await session.commit()
+                    if publish_task is not None:
+                        redis = ctx.get("redis")
+                        if redis is not None:
+                            await cast(ArqRedis, redis).enqueue_job(
+                                "publish_instagram_media", str(publish_task.id), str(publication.id)
+                            )
                     return
                 if status_code in {"ERROR", "EXPIRED"}:
                     raise InstagramAPIError(str(result.get("status", "Instagram no pudo procesar el contenedor.")))
@@ -217,6 +257,192 @@ async def publish_instagram_media(ctx: dict[str, object], task_id: str, publicat
             task.progress_message = "Falló la publicación"
             task.completed_at = datetime.now(UTC)
             await record_audit(session, publication.requested_by_user_id, "instagram.publish.failed", "instagram_publication", str(publication.id), {"error": str(exc), "container_id": publication.container_id})
+        await session.commit()
+
+
+async def prepare_facebook_media(
+    ctx: dict[str, object], task_id: str, publication_id: str | None = None
+) -> None:
+    async with SessionFactory() as session:
+        task = await session.get(Task, UUID(task_id))
+        if task is None or task.status not in {"queued", "uploading"}:
+            return
+        resolved_publication_id = publication_id or task.result
+        publication = (
+            await session.get(FacebookPublication, UUID(resolved_publication_id))
+            if resolved_publication_id
+            else None
+        )
+        if publication is None:
+            task.status = "failed"
+            task.error = "La publicación asociada ya no existe."
+            task.completed_at = datetime.now(UTC)
+            await session.commit()
+            return
+        account = await session.get(FacebookAccount, publication.account_id)
+        if account is None or not account.enabled:
+            task.status = publication.status = "failed"
+            task.error = publication.error = "La página de Facebook no está disponible."
+            task.completed_at = datetime.now(UTC)
+            await session.commit()
+            return
+        try:
+            task.status = publication.status = "uploading"
+            task.started_at = task.started_at or datetime.now(UTC)
+            task.progress_current = 1
+            task.progress_message = (
+                "Subiendo foto no publicada para la historia"
+                if publication.placement == "story"
+                else "Validando publicación para el feed"
+            )
+            await session.commit()
+            if publication.placement == "story" and publication.photo_id is None:
+                result = await FacebookPublisherPlugin(
+                    timeout=get_settings().http_timeout_seconds
+                ).upload_story_photo(
+                    credentials_for_facebook_account(account),
+                    publication.image_url,
+                    publication.caption,
+                )
+                photo_id = result.get("id")
+                if not isinstance(photo_id, str) or not photo_id:
+                    raise FacebookAPIError("Facebook no devolvió el identificador de la foto.")
+                publication.photo_id = photo_id
+                publication.sanitized_response_json = json.dumps(result, ensure_ascii=False)
+            publication.status = task.status = "ready"
+            publication.ready_at = task.completed_at = datetime.now(UTC)
+            publication.error = task.error = None
+            task.progress_current = task.progress_total = 2
+            task.progress_message = (
+                "Contenido listo; publicación automática en cola"
+                if account.auto_publish
+                else "Contenido listo; requiere confirmación humana"
+            )
+            await record_audit(
+                session,
+                publication.requested_by_user_id,
+                "facebook.media.ready",
+                "facebook_publication",
+                str(publication.id),
+                {"placement": publication.placement, "photo_id": publication.photo_id},
+            )
+            publish_task: Task | None = None
+            if account.auto_publish:
+                publish_task = Task(
+                    type="facebook.media.publish",
+                    owner_user_id=publication.requested_by_user_id,
+                    status="queued",
+                    progress_message="Publicación automática en cola",
+                    result=str(publication.id),
+                )
+                session.add(publish_task)
+                await session.flush()
+                await record_audit(
+                    session,
+                    publication.requested_by_user_id,
+                    "facebook.publish.automatic",
+                    "facebook_publication",
+                    str(publication.id),
+                    {"placement": publication.placement},
+                )
+            await session.commit()
+            if publish_task is not None:
+                redis = ctx.get("redis")
+                if redis is not None:
+                    await cast(ArqRedis, redis).enqueue_job(
+                        "publish_facebook_media", str(publish_task.id), str(publication.id)
+                    )
+        except (FacebookAPIError, SecretDecryptionError, ValueError) as exc:
+            task.status = publication.status = "failed"
+            task.error = publication.error = str(exc)
+            task.progress_message = "Falló la preparación de Facebook"
+            task.completed_at = datetime.now(UTC)
+            await record_audit(
+                session,
+                publication.requested_by_user_id,
+                "facebook.media.failed",
+                "facebook_publication",
+                str(publication.id),
+                {"error": str(exc), "placement": publication.placement},
+            )
+            await session.commit()
+
+
+async def publish_facebook_media(
+    ctx: dict[str, object], task_id: str, publication_id: str | None = None
+) -> None:
+    async with SessionFactory() as session:
+        task = await session.get(Task, UUID(task_id))
+        if task is None or task.status != "queued":
+            return
+        resolved_publication_id = publication_id or task.result
+        publication = (
+            await session.get(FacebookPublication, UUID(resolved_publication_id))
+            if resolved_publication_id
+            else None
+        )
+        if publication is None or publication.status != "ready":
+            task.status = "failed"
+            task.error = "El contenido no está listo para publicar."
+            task.completed_at = datetime.now(UTC)
+            await session.commit()
+            return
+        account = await session.get(FacebookAccount, publication.account_id)
+        if account is None or not account.enabled:
+            task.status = publication.status = "failed"
+            task.error = publication.error = "La página de Facebook no está disponible."
+            task.completed_at = datetime.now(UTC)
+            await session.commit()
+            return
+        task.status = publication.status = "publishing"
+        task.started_at = datetime.now(UTC)
+        task.progress_message = "Publicando en Facebook"
+        await session.commit()
+        try:
+            plugin = FacebookPublisherPlugin(timeout=get_settings().http_timeout_seconds)
+            credentials = credentials_for_facebook_account(account)
+            if publication.placement == "story":
+                if not publication.photo_id:
+                    raise FacebookAPIError("La foto de la historia no fue preparada.")
+                result = await plugin.publish_photo_story(credentials, publication.photo_id)
+            else:
+                result = await plugin.publish_feed_image(
+                    credentials, publication.image_url, publication.caption
+                )
+                returned_photo_id = result.get("id")
+                if isinstance(returned_photo_id, str):
+                    publication.photo_id = returned_photo_id
+            post_id = result.get("post_id") or result.get("id")
+            if not isinstance(post_id, str) or not post_id:
+                raise FacebookAPIError("Facebook no devolvió el identificador de la publicación.")
+            publication.post_id = post_id
+            publication.sanitized_response_json = json.dumps(result, ensure_ascii=False)
+            publication.status = task.status = "published"
+            publication.published_at = task.completed_at = datetime.now(UTC)
+            publication.error = task.error = None
+            task.progress_current = task.progress_total = 1
+            task.progress_message = "Contenido publicado en Facebook"
+            await record_audit(
+                session,
+                publication.requested_by_user_id,
+                "facebook.media.published",
+                "facebook_publication",
+                str(publication.id),
+                {"placement": publication.placement, "post_id": post_id},
+            )
+        except (FacebookAPIError, SecretDecryptionError, ValueError) as exc:
+            publication.status = task.status = "failed"
+            publication.error = task.error = str(exc)
+            task.progress_message = "Falló la publicación en Facebook"
+            task.completed_at = datetime.now(UTC)
+            await record_audit(
+                session,
+                publication.requested_by_user_id,
+                "facebook.publish.failed",
+                "facebook_publication",
+                str(publication.id),
+                {"error": str(exc), "placement": publication.placement},
+            )
         await session.commit()
 
 

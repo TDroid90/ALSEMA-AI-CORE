@@ -101,6 +101,7 @@ async def retry_task(task_id: UUID, session: AsyncSession = Depends(get_session)
         "system.sleep": "run_sleep_task",
         "provider.ollama.pull": "pull_ollama_model",
         "instagram.media.prepare": "prepare_instagram_media",
+        "facebook.media.prepare": "prepare_facebook_media",
     }.get(task.type)
     if job_name is None:
         task.status = "failed"; task.error = "El tipo de tarea no admite reintento."; task.completed_at = datetime.now(UTC); await session.commit()

@@ -28,7 +28,7 @@ class InstagramAPIError(RuntimeError):
 
 class InstagramPublisher(Protocol):
     async def test_connection(self, credentials: InstagramCredentials) -> dict[str, object]: ...
-    async def create_image_container(self, credentials: InstagramCredentials, image_url: str, caption: str) -> dict[str, object]: ...
+    async def create_image_container(self, credentials: InstagramCredentials, image_url: str, caption: str, placement: str = "feed") -> dict[str, object]: ...
     async def get_container_status(self, credentials: InstagramCredentials, container_id: str) -> dict[str, object]: ...
     async def publish_container(self, credentials: InstagramCredentials, container_id: str) -> dict[str, object]: ...
 
@@ -64,7 +64,7 @@ class InstagramPublisherPlugin:
         path: str,
         *,
         params: dict[str, str] | None = None,
-        data: dict[str, str] | None = None,
+        payload: dict[str, object] | None = None,
     ) -> dict[str, object]:
         url = f"{INSTAGRAM_GRAPH_HOST}/{credentials.api_version}/{path.lstrip('/')}"
         headers = {"Authorization": f"Bearer {credentials.access_token}"}
@@ -74,7 +74,13 @@ class InstagramPublisherPlugin:
                 timeout=self._timeout,
                 follow_redirects=False,
             ) as client:
-                response = await client.request(method, url, params=params, data=data, headers=headers)
+                response = await client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=payload,
+                    headers={**headers, "Content-Type": "application/json; charset=utf-8"},
+                )
         except httpx.HTTPError as exc:
             raise InstagramAPIError("No se pudo conectar con Instagram.") from exc
         try:
@@ -104,12 +110,23 @@ class InstagramPublisherPlugin:
             "connection_status": "connected",
         }
 
-    async def create_image_container(self, credentials: InstagramCredentials, image_url: str, caption: str) -> dict[str, object]:
+    async def create_image_container(
+        self,
+        credentials: InstagramCredentials,
+        image_url: str,
+        caption: str,
+        placement: str = "feed",
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {"image_url": image_url}
+        if caption:
+            payload["caption"] = caption
+        if placement == "story":
+            payload["media_type"] = "STORIES"
         return await self._request(
             "POST",
             credentials,
             f"{credentials.instagram_user_id}/media",
-            data={"image_url": image_url, "caption": caption},
+            payload=payload,
         )
 
     async def get_container_status(self, credentials: InstagramCredentials, container_id: str) -> dict[str, object]:
@@ -125,7 +142,7 @@ class InstagramPublisherPlugin:
             "POST",
             credentials,
             f"{credentials.instagram_user_id}/media_publish",
-            data={"creation_id": container_id},
+            payload={"creation_id": container_id},
         )
 
 

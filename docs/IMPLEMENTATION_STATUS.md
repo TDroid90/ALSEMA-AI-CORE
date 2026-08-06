@@ -7,6 +7,15 @@
 - Connection testing, image-container creation, status polling, durable ARQ state and publication history are available under `/api/v1/plugins/instagram`.
 - Publishing is split from preparation and requires an authenticated human confirmation payload.
 - Unit and simulated integration tests verify redaction, encryption and that preparation never calls `media_publish`.
+- Feed and photo Stories are supported, with manual or per-account automatic publication.
+- Spanish text is normalized and sent as JSON UTF-8.
+
+## Facebook publisher
+
+- Generic multi-page integration using `https://graph.facebook.com`.
+- Secure encrypted Page tokens, connection checks, feed images and photo Stories.
+- Durable ARQ preparation/publication states and per-account manual or automatic publication.
+- Unit and E2E tests cover secret redaction, the unpublished-photo Story flow and Spanish UTF-8 text.
 
 ## Verified foundation slice — 2026-08-04
 

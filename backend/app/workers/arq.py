@@ -10,7 +10,9 @@ from app.modules.tasks.models import Task
 from app.modules.workflows.models import WorkflowRun, WorkflowSchedule
 from app.shared.database import SessionFactory
 from app.workers.jobs import (
+    prepare_facebook_media,
     prepare_instagram_media,
+    publish_facebook_media,
     publish_instagram_media,
     pull_ollama_model,
     run_sleep_task,
@@ -24,6 +26,7 @@ def recoverable_task_job(task_type: str) -> str | None:
         "system.smoke": "run_smoke_task",
         "system.sleep": "run_sleep_task",
         "instagram.media.prepare": "prepare_instagram_media",
+        "facebook.media.prepare": "prepare_facebook_media",
     }.get(task_type)
 
 
@@ -105,6 +108,8 @@ class WorkerSettings:
         pull_ollama_model,
         prepare_instagram_media,
         publish_instagram_media,
+        prepare_facebook_media,
+        publish_facebook_media,
     ]
     cron_jobs = [cron(heartbeat, second={0, 10, 20, 30, 40, 50}), cron(dispatch_due_schedules, second={0, 10, 20, 30, 40, 50})]
     on_startup = startup

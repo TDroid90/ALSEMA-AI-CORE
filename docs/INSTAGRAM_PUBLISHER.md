@@ -45,7 +45,12 @@ Los cuatro campos de credenciales deben estar completos o todos vacíos. Las cue
 5. Al recibir `FINISHED`, la publicación queda `ready` y el worker se detiene.
 6. La UI muestra cuenta, imagen, caption, contenedor y estado.
 7. Una persona confirma expresamente la publicación.
-8. El backend exige `{ "confirmed": true }`, crea otra tarea y recién entonces llama a `POST /{ig_user_id}/media_publish`.
+8. En modo manual, el backend exige `{ "confirmed": true }`, crea otra tarea y recién entonces llama a `POST /{ig_user_id}/media_publish`.
+9. En modo automático por cuenta, el worker encola esa segunda tarea cuando el contenedor queda listo.
+
+Para Historias, la creación agrega `media_type=STORIES`. El flujo de contenedor, espera y publicación es el mismo que para el feed.
+
+La UI y el adaptador usan JSON UTF-8; el texto se normaliza en NFC para conservar acentos, `ñ` y emojis.
 
 ```text
 queued → uploading → processing → ready → publishing → published

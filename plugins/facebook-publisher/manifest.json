@@ -1,0 +1,8 @@
+{
+  "id": "facebook-publisher",
+  "name": "Facebook Publisher",
+  "version": "1.0.0",
+  "description": "Publicación genérica de imágenes en el feed y las historias de páginas de Facebook.",
+  "permissions": ["network:graph.facebook.com", "secrets:own", "tasks:enqueue"],
+  "healthcheck": "/api/v1/plugins/facebook/test-connection"
+}

@@ -70,16 +70,23 @@ async def test_container_integration_stops_before_publish() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request.url.path)
         if request.url.path.endswith("/media"):
-            form = request.content.decode()
-            assert "image_url=https%3A%2F%2Fimages.example.com%2Ftest.jpg" in form
-            assert "caption=Nota+de+prueba" in form
+            payload = json.loads(request.content.decode("utf-8"))
+            assert payload == {
+                "image_url": "https://images.example.com/test.jpg",
+                "caption": "Información técnica: acción y publicación 🎙️",
+            }
+            assert request.headers["content-type"] == "application/json; charset=utf-8"
             return httpx.Response(200, json={"id": "container-123"})
         if request.url.path.endswith("/container-123"):
             return httpx.Response(200, json={"status_code": "FINISHED", "status": "Finished"})
         pytest.fail(f"Llamada inesperada: {request.url.path}")
 
     plugin = InstagramPublisherPlugin(transport=httpx.MockTransport(handler))
-    created = await plugin.create_image_container(credentials(), "https://images.example.com/test.jpg", "Nota de prueba")
+    created = await plugin.create_image_container(
+        credentials(),
+        "https://images.example.com/test.jpg",
+        "Información técnica: acción y publicación 🎙️",
+    )
     state = await plugin.get_container_status(credentials(), str(created["id"]))
 
     assert state["status_code"] == "FINISHED"
@@ -88,6 +95,26 @@ async def test_container_integration_stops_before_publish() -> None:
         "/v23.0/container-123",
     ]
     assert not any(path.endswith("/media_publish") for path in calls)
+
+
+@pytest.mark.asyncio
+async def test_story_container_uses_stories_media_type() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload["media_type"] == "STORIES"
+        assert payload["caption"] == "Última información desde Río Grande"
+        return httpx.Response(200, json={"id": "story-container"})
+
+    result = await InstagramPublisherPlugin(
+        transport=httpx.MockTransport(handler)
+    ).create_image_container(
+        credentials(),
+        "https://images.example.com/story.jpg",
+        "Última información desde Río Grande",
+        "story",
+    )
+
+    assert result["id"] == "story-container"
 
 
 def test_secret_cipher_encrypts_at_rest() -> None:
