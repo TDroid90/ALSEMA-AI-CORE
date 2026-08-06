@@ -22,6 +22,7 @@ from app.modules.identity.security import (
 from app.shared.database import get_session
 
 router = APIRouter(prefix="/api/v1", tags=["identity"])
+MACHINE_API_KEY_SCOPES = {"agents:read", "agents:execute", "models:read", "tasks:read"}
 
 
 class SetupRequest(BaseModel):
@@ -43,6 +44,21 @@ class ApiKeyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     scopes: list[str] = Field(min_length=1)
     expires_at: datetime | None = None
+
+
+def serialize_api_key(key: ApiKey) -> dict[str, object]:
+    return {
+        "id": str(key.id),
+        "name": key.name,
+        "key_prefix": key.key_prefix,
+        "user_id": str(key.user_id),
+        "scopes": json.loads(key.scopes),
+        "enabled": key.enabled,
+        "expires_at": key.expires_at.isoformat() if key.expires_at else None,
+        "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+        "created_at": key.created_at.isoformat(),
+        "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None,
+    }
 
 
 @router.get("/setup/status")
@@ -103,28 +119,48 @@ async def logout(payload: RefreshRequest, session: AsyncSession = Depends(get_se
 
 @router.get("/api-keys")
 async def list_api_keys(session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> dict[str, object]:
-    keys = (await session.scalars(select(ApiKey).where(ApiKey.owner_user_id == user.id).order_by(ApiKey.created_at.desc()))).all()
-    return {"items": [{"id": str(key.id), "name": key.name, "prefix": key.prefix, "scopes": json.loads(key.scopes), "expires_at": key.expires_at.isoformat() if key.expires_at else None, "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None, "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None} for key in keys]}
+    keys = (await session.scalars(select(ApiKey).where(ApiKey.user_id == user.id).order_by(ApiKey.created_at.desc()))).all()
+    return {"items": [serialize_api_key(key) for key in keys], "available_scopes": sorted(MACHINE_API_KEY_SCOPES)}
 
 
 @router.post("/api-keys", status_code=status.HTTP_201_CREATED)
 async def create_api_key(payload: ApiKeyRequest, session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> dict[str, object]:
-    if payload.expires_at is not None and payload.expires_at <= datetime.now(UTC):
+    scopes = sorted(set(payload.scopes))
+    unsupported_scopes = set(scopes) - MACHINE_API_KEY_SCOPES
+    if unsupported_scopes:
+        raise HTTPException(status_code=422, detail=f"Scopes no permitidos: {', '.join(sorted(unsupported_scopes))}")
+    expires_at = payload.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at is not None and expires_at <= datetime.now(UTC):
         raise HTTPException(status_code=422, detail="La expiración debe ser futura.")
     prefix, raw_key = generate_api_key()
-    key = ApiKey(owner_user_id=user.id, name=payload.name, prefix=prefix, secret_hash=hash_api_key(raw_key), scopes=json.dumps(sorted(set(payload.scopes))), expires_at=payload.expires_at)
+    key = ApiKey(user_id=user.id, name=payload.name, key_prefix=prefix, key_hash=hash_api_key(raw_key), scopes=json.dumps(scopes), enabled=True, expires_at=expires_at)
     session.add(key)
-    await record_audit(session, user.id, "api_key.created", "api_key", str(key.id), {"name": key.name, "scopes": payload.scopes})
+    await session.flush()
+    await record_audit(session, user.id, "api_key.created", "api_key", str(key.id), {"name": key.name, "scopes": scopes, "key_prefix": key.key_prefix})
     await session.commit()
-    return {"id": str(key.id), "name": key.name, "prefix": key.prefix, "scopes": payload.scopes, "api_key": raw_key}
+    await session.refresh(key)
+    return {**serialize_api_key(key), "api_key": raw_key}
 
 
 @router.post("/api-keys/{key_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_api_key(key_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> None:
     key = await session.get(ApiKey, key_id)
-    if key is None or key.owner_user_id != user.id:
+    if key is None or key.user_id != user.id:
         raise HTTPException(status_code=404, detail="API key no encontrada.")
     if key.revoked_at is None:
         key.revoked_at = datetime.now(UTC)
-        await record_audit(session, user.id, "api_key.revoked", "api_key", str(key.id))
+        key.enabled = False
+        await record_audit(session, user.id, "api_key.revoked", "api_key", str(key.id), {"key_prefix": key.key_prefix})
         await session.commit()
+
+
+@router.delete("/api-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_api_key(key_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> None:
+    key = await session.get(ApiKey, key_id)
+    if key is None or key.user_id != user.id:
+        raise HTTPException(status_code=404, detail="API key no encontrada.")
+    await record_audit(session, user.id, "api_key.deleted", "api_key", str(key.id), {"name": key.name, "key_prefix": key.key_prefix})
+    await session.delete(key)
+    await session.commit()

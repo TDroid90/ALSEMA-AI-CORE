@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, require_permission
+from app.api.dependencies import require_permission
 from app.config.settings import get_settings
 from app.modules.identity.audit import record_audit
 from app.modules.identity.models import User
@@ -51,7 +51,7 @@ async def sync_ollama(session: AsyncSession) -> list[ProviderModel]:
 
 
 @router.get("")
-async def list_models(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_models(session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("models:read"))) -> dict[str, object]:
     models = (await session.scalars(select(ProviderModel).order_by(ProviderModel.display_name))).all()
     return {"items": [{"id": str(item.id), "provider": item.provider, "model": item.external_id, "name": item.display_name, "status": item.status, "metadata": json.loads(item.metadata_json), "last_seen_at": item.last_seen_at.isoformat() if item.last_seen_at else None} for item in models]}
 

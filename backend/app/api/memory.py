@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import require_permission
 from app.modules.identity.models import User
 from app.modules.memory.models import MemoryEntry
 from app.shared.database import get_session
@@ -23,7 +23,7 @@ class MemoryInput(BaseModel):
 
 
 @router.get("")
-async def list_memory(namespace: str | None = None, query: str | None = None, scope: str | None = None, scope_key: str | None = None, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_memory(namespace: str | None = None, query: str | None = None, scope: str | None = None, scope_key: str | None = None, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("memory:read"))) -> dict[str, object]:
     statement = select(MemoryEntry).where(or_(MemoryEntry.owner_user_id == user.id, MemoryEntry.scope == "global"), or_(MemoryEntry.expires_at.is_(None), MemoryEntry.expires_at > datetime.now(UTC))).order_by(MemoryEntry.created_at.desc())
     if namespace: statement = statement.where(MemoryEntry.namespace == namespace)
     if query: statement = statement.where(MemoryEntry.content.ilike(f"%{query}%"))
@@ -34,7 +34,7 @@ async def list_memory(namespace: str | None = None, query: str | None = None, sc
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_memory(payload: MemoryInput, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def create_memory(payload: MemoryInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("memory:write"))) -> dict[str, str]:
     if payload.expires_at and payload.expires_at <= datetime.now(UTC): raise HTTPException(status_code=422, detail="La expiración debe ser futura.")
     if payload.scope == "global" and not user.is_system_admin: raise HTTPException(status_code=403, detail="Solo un administrador puede crear memoria global.")
     if payload.scope not in {"user", "global"} and not payload.scope_key: raise HTTPException(status_code=422, detail="El scope requiere scope_key.")
@@ -44,7 +44,7 @@ async def create_memory(payload: MemoryInput, session: AsyncSession = Depends(ge
 
 
 @router.delete("/{memory_id}", status_code=204)
-async def delete_memory(memory_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> None:
+async def delete_memory(memory_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("memory:write"))) -> None:
     item = await session.get(MemoryEntry, memory_id)
     if item is None or item.owner_user_id != user.id: raise HTTPException(status_code=404, detail="Memoria no encontrada.")
     await session.delete(item); await session.commit()

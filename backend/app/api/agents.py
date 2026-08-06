@@ -202,7 +202,7 @@ async def restore_agent(
 
 
 @router.post("/{agent_id}/run")
-async def run_agent(agent_id: UUID, payload: AgentRunInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("agents:read"))) -> dict[str, object]:
+async def run_agent(agent_id: UUID, payload: AgentRunInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("agents:execute"))) -> dict[str, object]:
     agent = await session.get(Agent, agent_id)
     if agent is None or (agent.owner_user_id != user.id and not user.is_system_admin): raise HTTPException(status_code=404, detail="Agente no encontrado.")
     if agent.status != "active":

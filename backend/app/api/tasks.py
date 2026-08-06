@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, require_system_admin
+from app.api.dependencies import require_permission, require_system_admin
 from app.config.settings import get_settings
 from app.modules.identity.models import User
 from app.modules.tasks.models import Task
@@ -26,7 +26,7 @@ def serialize_task(task: Task) -> dict[str, object]:
 
 
 @router.get("")
-async def list_tasks(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_tasks(session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("tasks:read"))) -> dict[str, object]:
     statement = select(Task).order_by(Task.created_at.desc()).limit(100)
     if not user.is_system_admin:
         statement = statement.where(Task.owner_user_id == user.id)
@@ -65,7 +65,7 @@ async def create_sleep_task(
 
 
 @router.get("/{task_id}")
-async def get_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def get_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("tasks:read"))) -> dict[str, object]:
     task = await session.get(Task, task_id)
     if task is None or (task.owner_user_id != user.id and not user.is_system_admin):
         raise HTTPException(status_code=404, detail="Tarea no encontrada.")
@@ -73,7 +73,7 @@ async def get_task(task_id: UUID, session: AsyncSession = Depends(get_session), 
 
 
 @router.post("/{task_id}/cancel")
-async def cancel_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def cancel_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> dict[str, object]:
     task = await session.get(Task, task_id)
     if task is None or (task.owner_user_id != user.id and not user.is_system_admin):
         raise HTTPException(status_code=404, detail="Tarea no encontrada.")
@@ -88,7 +88,7 @@ async def cancel_task(task_id: UUID, session: AsyncSession = Depends(get_session
 
 
 @router.post("/{task_id}/retry", status_code=status.HTTP_202_ACCEPTED)
-async def retry_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def retry_task(task_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_system_admin)) -> dict[str, object]:
     original = await session.get(Task, task_id)
     if original is None or (original.owner_user_id != user.id and not user.is_system_admin):
         raise HTTPException(status_code=404, detail="Tarea no encontrada.")

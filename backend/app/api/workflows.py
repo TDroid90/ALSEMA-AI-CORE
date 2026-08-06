@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import require_permission
 from app.config.settings import get_settings
 from app.modules.identity.audit import record_audit
 from app.modules.identity.models import User
@@ -45,7 +45,7 @@ class ScheduleInput(BaseModel):
 
 
 @router.get("")
-async def list_workflows(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_workflows(session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, object]:
     statement = select(Workflow).order_by(Workflow.created_at.desc())
     if not user.is_system_admin:
         statement = statement.where(Workflow.owner_user_id == user.id)
@@ -116,7 +116,7 @@ def validate_graph(graph: Graph) -> None:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_workflow(payload: WorkflowInput, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def create_workflow(payload: WorkflowInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, str]:
     validate_graph(payload.graph)
     workflow = Workflow(owner_user_id=user.id, name=payload.name, description=payload.description)
     session.add(workflow); await session.flush()
@@ -129,7 +129,7 @@ async def create_workflow(payload: WorkflowInput, session: AsyncSession = Depend
 async def get_workflow(
     workflow_id: UUID,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("workflows:run")),
 ) -> dict[str, object]:
     workflow = await session.get(Workflow, workflow_id)
     if workflow is None or (workflow.owner_user_id != user.id and not user.is_system_admin):
@@ -159,7 +159,7 @@ async def get_workflow(
 
 
 @router.post("/{workflow_id}/versions", status_code=status.HTTP_201_CREATED)
-async def create_version(workflow_id: UUID, payload: WorkflowInput, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def create_version(workflow_id: UUID, payload: WorkflowInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, str]:
     workflow = await session.get(Workflow, workflow_id)
     if workflow is None or workflow.owner_user_id != user.id: raise HTTPException(status_code=404, detail="Workflow no encontrado.")
     validate_graph(payload.graph)
@@ -170,7 +170,7 @@ async def create_version(workflow_id: UUID, payload: WorkflowInput, session: Asy
 
 
 @router.post("/{workflow_id}/versions/{version_id}/publish")
-async def publish_workflow(workflow_id: UUID, version_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def publish_workflow(workflow_id: UUID, version_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, str]:
     workflow = await session.get(Workflow, workflow_id); version = await session.get(WorkflowVersion, version_id)
     if workflow is None or version is None or workflow.owner_user_id != user.id or version.workflow_id != workflow.id: raise HTTPException(status_code=404, detail="Versión no encontrada.")
     version.status = "published"; workflow.status = "active"
@@ -180,7 +180,7 @@ async def publish_workflow(workflow_id: UUID, version_id: UUID, session: AsyncSe
 
 
 @router.post("/{workflow_id}/versions/{version_id}/runs", status_code=status.HTTP_202_ACCEPTED)
-async def run_workflow(workflow_id: UUID, version_id: UUID, payload: RunInput, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def run_workflow(workflow_id: UUID, version_id: UUID, payload: RunInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, str]:
     workflow = await session.get(Workflow, workflow_id); version = await session.get(WorkflowVersion, version_id)
     if workflow is None or version is None or workflow.owner_user_id != user.id or version.workflow_id != workflow.id or version.status != "published": raise HTTPException(status_code=409, detail="Workflow publicado no encontrado.")
     run = WorkflowRun(workflow_version_id=version.id, owner_user_id=user.id, input_json=json.dumps(payload.input))
@@ -195,7 +195,7 @@ async def schedule_workflow(
     version_id: UUID,
     payload: ScheduleInput,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("workflows:run")),
 ) -> dict[str, str]:
     workflow = await session.get(Workflow, workflow_id)
     version = await session.get(WorkflowVersion, version_id)
@@ -212,14 +212,14 @@ async def schedule_workflow(
 
 
 @router.get("/runs/{run_id}")
-async def get_run(run_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def get_run(run_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, object]:
     run = await session.get(WorkflowRun, run_id)
     if run is None or run.owner_user_id != user.id: raise HTTPException(status_code=404, detail="Ejecución no encontrada.")
     return {"id": str(run.id), "status": run.status, "output": json.loads(run.output_json) if run.output_json else None, "error": run.error}
 
 
 @router.post("/runs/{run_id}/approval", status_code=status.HTTP_202_ACCEPTED)
-async def decide_approval(run_id: UUID, payload: ApprovalInput, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, str]:
+async def decide_approval(run_id: UUID, payload: ApprovalInput, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("workflows:run"))) -> dict[str, str]:
     run = await session.get(WorkflowRun, run_id)
     if run is None or (run.owner_user_id != user.id and not user.is_system_admin):
         raise HTTPException(status_code=404, detail="Ejecución no encontrada.")

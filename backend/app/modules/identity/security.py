@@ -9,6 +9,8 @@ from pwdlib import PasswordHash
 from app.config.settings import get_settings
 
 password_hash = PasswordHash.recommended()
+API_KEY_PREFIX = "alsema_sk_"
+API_KEY_LOOKUP_LENGTH = 20
 
 
 def hash_password(password: str) -> str:
@@ -34,8 +36,12 @@ def hash_refresh_token(token: str) -> str:
 
 
 def generate_api_key() -> tuple[str, str]:
-    prefix = secrets.token_hex(4)
-    return prefix, f"aas_local_{prefix}_{secrets.token_urlsafe(32)}"
+    raw_key = f"{API_KEY_PREFIX}{secrets.token_urlsafe(36)}"
+    return raw_key[:API_KEY_LOOKUP_LENGTH], raw_key
+
+
+def api_key_prefix(token: str) -> str:
+    return token[:API_KEY_LOOKUP_LENGTH]
 
 
 def hash_api_key(token: str) -> str:

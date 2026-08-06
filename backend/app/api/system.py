@@ -6,7 +6,7 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import require_permission
 from app.config.settings import get_settings
 from app.modules.identity.models import User
 from app.modules.providers.application import OllamaHealthService
@@ -52,7 +52,7 @@ async def system_status() -> dict[str, object]:
 
 
 @router.get("/api/v1/providers/ollama/models")
-async def list_ollama_models(user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_ollama_models(user: User = Depends(require_permission("models:read"))) -> dict[str, object]:
     service = OllamaHealthService(get_settings())
     try:
         return {"items": await service.list_models()}

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, require_permission
+from app.api.dependencies import require_permission
 from app.config.settings import get_settings
 from app.modules.conversations.models import Conversation, Message
 from app.modules.identity.models import User
@@ -55,7 +55,7 @@ async def create_conversation(payload: CreateConversation, session: AsyncSession
 
 
 @router.get("/{conversation_id}/messages")
-async def list_messages(conversation_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> dict[str, object]:
+async def list_messages(conversation_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("conversations:read"))) -> dict[str, object]:
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None or not can_access(conversation, user):
         raise HTTPException(status_code=404, detail="Conversación no encontrada.")
@@ -69,7 +69,7 @@ async def send_message(
     payload: SendMessage,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("conversations:write")),
 ) -> StreamingResponse:
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None or not can_access(conversation, user):
@@ -130,7 +130,7 @@ async def cancel_message(
     conversation_id: UUID,
     message_id: UUID,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("conversations:write")),
 ) -> dict[str, str]:
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None or not can_access(conversation, user):
@@ -146,7 +146,7 @@ async def cancel_message(
 
 
 @router.delete("/{conversation_id}", status_code=204)
-async def delete_conversation(conversation_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)) -> None:
+async def delete_conversation(conversation_id: UUID, session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("conversations:write"))) -> None:
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None or not can_access(conversation, user):
         raise HTTPException(status_code=404, detail="Conversación no encontrada.")

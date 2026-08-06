@@ -192,6 +192,25 @@ for its real first-run administrator setup.
 - Automatic publication is enabled for the registered Page; approved future feed
   and Story jobs continue from `ready` to `published` without a manual click.
 
+## Machine-to-machine authentication
+
+- API Keys use the `alsema_sk_` format, persist only a SHA-256 hash and expose the
+  full value once at creation.
+- `Authorization: Bearer` and `X-API-Key` are supported without falling back from
+  an invalid API key header to a user JWT.
+- Initial service scopes cover agent reads/execution plus model and task reads.
+- Administrators can create, list, revoke and delete keys from
+  `#/settings/api-keys`; later responses expose only the prefix and timestamps.
+- Migration `0021_machine_api_keys` is applied and is the current Alembic head.
+- The `instanews-rewriter` credential was created with only `agents:read` and
+  `agents:execute`. Its safe prefix is `alsema_sk_nnK5PGS6Ly`; its full value was
+  copied directly to the operator clipboard and was not written to this repository.
+- Live validation returned `200` from `GET /api/v1/agents` using both supported
+  authentication headers, updated `last_used_at`, and returned `403` from
+  `GET /api/v1/models` because the credential deliberately lacks `models:read`.
+- Backend verification passed with 44 tests, Ruff and MyPy; all four frontend E2E
+  tests passed against `http://localhost:5173`, including the API Keys screen.
+
 ## Active next work
 
 1. Automated API tests, linting and CI execution.
