@@ -19,7 +19,7 @@ def credentials() -> InstagramCredentials:
     return InstagramCredentials(
         app_id="123456",
         app_secret="test-app-secret",
-        instagram_user_id="17841444792709838",
+        instagram_user_id="17841400000000000",
         access_token="test-access-token",
         api_version="v23.0",
     )
@@ -28,19 +28,19 @@ def credentials() -> InstagramCredentials:
 @pytest.mark.asyncio
 async def test_connection_returns_profile_without_exposing_token() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/v23.0/17841444792709838"
+        assert request.url.path == "/v23.0/17841400000000000"
         assert request.url.params["fields"] == "id,username,account_type"
         assert request.headers["authorization"] == "Bearer test-access-token"
         assert "access_token" not in str(request.url)
         return httpx.Response(
             200,
-            json={"id": "17841444792709838", "username": "test_account", "account_type": "BUSINESS"},
+            json={"id": "17841400000000000", "username": "test_account", "account_type": "BUSINESS"},
         )
 
     result = await InstagramPublisherPlugin(transport=httpx.MockTransport(handler)).test_connection(credentials())
 
     assert result == {
-        "id": "17841444792709838",
+        "id": "17841400000000000",
         "username": "test_account",
         "account_type": "BUSINESS",
         "connection_status": "connected",
@@ -84,7 +84,7 @@ async def test_container_integration_stops_before_publish() -> None:
 
     assert state["status_code"] == "FINISHED"
     assert calls == [
-        "/v23.0/17841444792709838/media",
+        "/v23.0/17841400000000000/media",
         "/v23.0/container-123",
     ]
     assert not any(path.endswith("/media_publish") for path in calls)

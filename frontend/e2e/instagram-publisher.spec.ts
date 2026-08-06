@@ -12,7 +12,7 @@ test("shows secure Instagram configuration and a ready container without publish
     if (path === "/api/v1/models/sync") return route.fulfill({ json: {} });
     if (path === "/api/v1/models") return route.fulfill({ json: { items: [] } });
     if (path === "/api/v1/plugins/instagram/accounts") {
-      return route.fulfill({ json: { items: [{ id: "11111111-1111-1111-1111-111111111111", account_label: "Cuenta editorial", app_id: "123", instagram_user_id: "17841444792709838", api_version: "v23.0", enabled: true, app_secret_configured: true, access_token_configured: true, last_connection_status: "connected" }] } });
+      return route.fulfill({ json: { items: [{ id: "11111111-1111-1111-1111-111111111111", account_label: "Cuenta editorial", app_id: "123", instagram_user_id: "17841400000000000", api_version: "v23.0", enabled: true, app_secret_configured: true, access_token_configured: true, last_connection_status: "connected" }] } });
     }
     if (path === "/api/v1/plugins/instagram/media") {
       return route.fulfill({ json: { items: [{ id: "22222222-2222-2222-2222-222222222222", account_id: "11111111-1111-1111-1111-111111111111", account_label: "Cuenta editorial", caption: "Resumen periodístico de prueba", image_url: "https://images.example.com/test.jpg", status: "ready", container_id: "container-123", created_at: "2026-08-05T12:00:00Z" }] } });
