@@ -1,0 +1,14 @@
+{
+  "id": "instagram-publisher",
+  "name": "Instagram Publisher",
+  "version": "1.0.0",
+  "core_version": ">=0.1.0 <2.0.0",
+  "description": "Publicación genérica y confirmada de imágenes mediante Instagram API with Instagram Login.",
+  "author": "ALSEMA",
+  "entrypoint": "app.modules.plugins.instagram:InstagramPublisherPlugin",
+  "capabilities": ["api_routes", "scheduled_jobs", "external_publish"],
+  "permissions": ["network.outbound", "database.write", "secrets.read"],
+  "settings_schema": "app.api.instagram:InstagramAccountCreate",
+  "healthcheck": "test_connection",
+  "allowed_hosts": ["graph.instagram.com"]
+}
