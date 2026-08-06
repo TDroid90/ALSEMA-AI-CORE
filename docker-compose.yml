@@ -1,0 +1,88 @@
+name: alsema-ai-core
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  tools-init:
+    image: busybox:1.37
+    command: ["sh", "-c", "mkdir -p /data/tools && chown -R 10001:10001 /data/tools"]
+    volumes:
+      - tools_data:/data/tools
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      DELETE: 1
+      IMAGES: 0
+      NETWORKS: 0
+      VOLUMES: 0
+      SERVICES: 0
+      TASKS: 0
+      EXEC: 0
+      BUILD: 0
+      AUTH: 0
+      SECRETS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  api:
+    build: ./backend
+    env_file: .env
+    command: ["/app/docker-entrypoint.sh", "api"]
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      tools-init: {condition: service_completed_successfully}
+      docker-proxy: {condition: service_started}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - tools_data:/data/tools
+
+  worker:
+    build: ./backend
+    env_file: .env
+    command: ["/app/docker-entrypoint.sh", "worker"]
+    depends_on:
+      redis: {condition: service_healthy}
+      tools-init: {condition: service_completed_successfully}
+      docker-proxy: {condition: service_started}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - tools_data:/data/tools
+
+  frontend:
+    build: ./frontend
+    ports: ["127.0.0.1:5173:80"]
+    depends_on:
+      api: {condition: service_started}
+
+volumes:
+  postgres_data:
+  redis_data:
+  tools_data:

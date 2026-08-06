@@ -4,11 +4,9 @@
 
 ## Estado
 
-**Foundation Build v1.0 — Biblia estructural cerrada y lista para implementación con Codex.**
+**Foundation Build v1.0 — implementación en curso.**
 
-La arquitectura, los contratos, la seguridad, el alcance, el diseño, la operación y los criterios de aceptación ya están documentados. La implementación del servidor todavía no comenzó.
-
-Este repositorio es la única fuente de verdad de ALSEMA AI CORE. Contendrá la documentación fundacional, la arquitectura, el backend, el frontend, los proveedores de IA, los agentes, las herramientas, los plugins, los workflows, la memoria, la seguridad, las pruebas y el despliegue.
+La especificación canónica sigue siendo la fuente de verdad. El corte funcional actual está documentado en `docs/IMPLEMENTATION_STATUS.md`.
 
 ## Qué es
 
@@ -29,24 +27,7 @@ El proveedor inicial de modelos será Ollama. La arquitectura admite otros prove
 
 ## Objetivo del Foundation Build
 
-La primera versión funcional debe entregar una base real y ejecutable con:
-
-- API REST versionada.
-- Streaming mediante Server-Sent Events.
-- Autenticación y administración inicial.
-- Interfaz web oscura, sobria y profesional.
-- Chat operativo mediante Ollama.
-- Abstracción de proveedores de IA.
-- Gestión de modelos y configuraciones.
-- Motor de agentes reutilizables.
-- Motor básico de herramientas y plugins.
-- Motor básico de workflows por nodos.
-- Cola de tareas, reintentos, progreso y cancelación.
-- Logs estructurados y estado del sistema.
-- Memoria persistente básica con separación por ámbito.
-- PostgreSQL, Redis y migraciones.
-- Docker Compose para desarrollo y operación local.
-- Pruebas automáticas y documentación OpenAPI.
+La primera versión funcional debe entregar una base real y ejecutable con API REST versionada, streaming, autenticación, interfaz web oscura, chat con Ollama, proveedores abstractos, agentes, herramientas, plugins, workflows, tareas, logs, memoria, PostgreSQL, Redis, Docker Compose y pruebas automáticas.
 
 Las integraciones empresariales, redes sociales, Google Sheets, generación de audio, imágenes, video y 3D quedan fuera de esta primera implementación. Están previstas mediante contratos extensibles, pero no deben simularse con código superficial.
 
@@ -85,67 +66,14 @@ Lee CODEX_MASTER_PROMPT.md y ejecutalo íntegramente. Antes de implementar, lee 
 
 El archivo `CODEX_MASTER_PROMPT.md` es la instrucción ejecutiva. La carpeta `docs/` es la especificación autoritativa.
 
-## Orden mínimo de lectura
+## Arranque actual
 
-1. `README.md`
-2. `CODEX_MASTER_PROMPT.md`
-3. `docs/29_DOCUMENT_INDEX.md`
-4. `docs/00_MANIFESTO.md`
-5. `docs/01_MAKEBUILD.md`
-6. `docs/02_ARCHITECTURE.md`
-7. `docs/03_SCOPE_AND_ACCEPTANCE.md`
-8. ADRs aceptados
+1. Copiá `.env.example` a `.env`, reemplazá los valores de ejemplo y configurá un `APP_SECRET_KEY` único.
+2. Configurá `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` juntos, o dejá ambos vacíos para usar la pantalla inicial.
+3. Ejecutá `docker compose up -d --build`.
+4. Abrí `http://localhost:5173`; OpenAPI está en `http://localhost:8000/docs`.
 
-En caso de contradicción, aplicar la precedencia definida en `docs/29_DOCUMENT_INDEX.md`.
-
-## Stack objetivo inicial
-
-### Backend
-
-- Python 3.12
-- FastAPI
-- Pydantic 2
-- SQLAlchemy 2
-- Alembic
-- PostgreSQL
-- Redis
-- ARQ
-- HTTPX
-- JWT con rotación de refresh tokens
-- Server-Sent Events
-
-### Frontend
-
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- React Router
-- TanStack Query
-- Zustand
-- React Hook Form
-- Zod
-
-### Calidad
-
-- Ruff
-- mypy
-- pytest
-- Vitest
-- Playwright
-- pre-commit
-- GitHub Actions
-
-## Arranque esperado al finalizar la implementación
-
-```bash
-cp .env.example .env
-docker compose up -d --build
-```
-
-La plataforma deberá exponer frontend, API, documentación OpenAPI, PostgreSQL, Redis, worker de tareas y estado de conexión con Ollama.
-
-La descarga de modelos será una acción explícita del administrador. El sistema no descargará modelos de gran tamaño sin autorización.
+PostgreSQL y Redis persisten en volúmenes Docker con nombre. Ollama queda externo y se conecta mediante `host.docker.internal`, de acuerdo con la arquitectura.
 
 ## Licencia
 

@@ -1,0 +1,1 @@
+"""Plugin registry bounded context."""

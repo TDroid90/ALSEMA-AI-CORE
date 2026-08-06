@@ -1,0 +1,12 @@
+{
+  "name": "foundation-python",
+  "version": "1.0.0",
+  "core_version": ">=0.1.0",
+  "description": "Demonstration Python plugin executed only by the restricted Docker sandbox.",
+  "entrypoint": "",
+  "capabilities": ["python.execute"],
+  "tools": [
+    {"key": "foundation-python.execute", "risk": "code_execution"}
+  ],
+  "permissions": []
+}
