@@ -595,7 +595,7 @@ async def run_workflow(ctx: dict[str, object], run_id: str) -> None:
                         raise ValueError(f"El nodo agente {node_id} requiere agent_id")
                     agent = await session.get(Agent, UUID(agent_id))
                     if agent is None or agent.owner_user_id != run.owner_user_id:
-                        raise ValueError(f"El agente del nodo {node_id} no estÃ¡ disponible para este workflow")
+                        raise ValueError(f"El agente del nodo {node_id} no está disponible para este workflow")
                     version = await session.scalar(
                         select(AgentVersion).where(
                             AgentVersion.agent_id == agent.id,
@@ -603,7 +603,7 @@ async def run_workflow(ctx: dict[str, object], run_id: str) -> None:
                         ).order_by(AgentVersion.version_number.desc())
                     )
                     if version is None:
-                        raise ValueError(f"El nodo agente {node_id} no tiene una versiÃ³n publicada")
+                        raise ValueError(f"El nodo agente {node_id} no tiene una versión publicada")
                     prompt = node_input if isinstance(node_input, str) else json.dumps(node_input, ensure_ascii=False)
                     body = {
                         "model": version.model,

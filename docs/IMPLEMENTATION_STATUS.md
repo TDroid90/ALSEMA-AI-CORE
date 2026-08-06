@@ -175,6 +175,23 @@ automated test coverage and CI execution.
 The disposable validation account was removed afterward. The deployed UI is ready
 for its real first-run administrator setup.
 
+## Facebook publisher real validation
+
+- Meta app `ALSEMA Page Publisher` was configured with `pages_manage_posts`,
+  `pages_read_engagement` and `pages_show_list`.
+- The authorization was limited to the existing `Cometa G` Page and business
+  assets instead of granting access to future assets.
+- The Page token was encrypted in ALSEMA and never written to repository files or
+  application logs.
+- The live connection check returned Page `Cometa G` with status `connected` and
+  the authorizing user has the `CREATE_CONTENT` task.
+- A real Facebook Story photo upload reached `ready` with photo ID
+  `1674622741330875`. It remained unpublished (`post_id` and `published_at` are
+  empty) so technical validation did not create visible test content.
+- The stored Spanish caption was verified from PostgreSQL as valid UTF-8 bytes.
+- Automatic publication is enabled for the registered Page; approved future feed
+  and Story jobs continue from `ready` to `published` without a manual click.
+
 ## Active next work
 
 1. Automated API tests, linting and CI execution.
