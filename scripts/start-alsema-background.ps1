@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $ProjectDirectory = Split-Path -Parent $PSScriptRoot
 $DockerDesktop = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
+$OllamaExecutable = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
 $StateDirectory = Join-Path $env:LOCALAPPDATA "ALSEMA-AI-CORE"
 $LogDirectory = Join-Path $StateDirectory "logs"
 $LogPath = Join-Path $LogDirectory "startup.log"
@@ -29,8 +30,41 @@ function Test-DockerEngine {
     }
 }
 
+function Test-OllamaServer {
+    try {
+        $Response = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 3
+        return $null -ne $Response.models
+    }
+    catch {
+        return $false
+    }
+}
+
 try {
     Write-StartupLog "Inicio automatico solicitado."
+
+    if (-not (Test-OllamaServer)) {
+        if (-not (Test-Path -LiteralPath $OllamaExecutable)) {
+            throw "Ollama no esta instalado en la ruta esperada: $OllamaExecutable"
+        }
+
+        Write-StartupLog "Iniciando Ollama en segundo plano."
+        $env:OLLAMA_HOST = "0.0.0.0:11434"
+        Start-Process -FilePath $OllamaExecutable -ArgumentList "serve" -WindowStyle Hidden
+
+        $OllamaDeadline = (Get-Date).AddMinutes(2)
+        while ((Get-Date) -lt $OllamaDeadline) {
+            Start-Sleep -Seconds 3
+            if (Test-OllamaServer) {
+                break
+            }
+        }
+    }
+
+    if (-not (Test-OllamaServer)) {
+        throw "Ollama no respondio dentro de los dos minutos permitidos."
+    }
+    Write-StartupLog "Ollama esta disponible."
 
     if (-not (Test-DockerEngine)) {
         if (-not (Test-Path -LiteralPath $DockerDesktop)) {

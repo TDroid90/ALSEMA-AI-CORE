@@ -46,6 +46,22 @@ def validate_output_schema(schema: dict[str, object] | None) -> None:
         raise HTTPException(status_code=422, detail="El esquema de salida no es JSON Schema válido.") from exc
 
 
+def build_ollama_chat_body(version: AgentVersion, user_input: str) -> dict[str, object]:
+    body: dict[str, object] = {
+        "model": version.model,
+        "messages": [
+            {"role": "system", "content": version.system_prompt},
+            {"role": "user", "content": user_input},
+        ],
+        "stream": False,
+        "options": {"temperature": float(version.temperature)},
+    }
+    if version.output_schema_json:
+        body["format"] = json.loads(version.output_schema_json)
+        body["think"] = False
+    return body
+
+
 @router.get("")
 async def list_agents(session: AsyncSession = Depends(get_session), user: User = Depends(require_permission("agents:read"))) -> dict[str, object]:
     statement = select(Agent).order_by(Agent.created_at.desc())
@@ -209,7 +225,7 @@ async def run_agent(agent_id: UUID, payload: AgentRunInput, session: AsyncSessio
         raise HTTPException(status_code=409, detail="El agente está inactivo.")
     version = await session.scalar(select(AgentVersion).where(AgentVersion.agent_id == agent_id, AgentVersion.status == "published").order_by(AgentVersion.version_number.desc()))
     if version is None: raise HTTPException(status_code=409, detail="El agente no tiene una versión publicada.")
-    body = {"model": version.model, "messages": [{"role": "system", "content": version.system_prompt}, {"role": "user", "content": payload.input}], "stream": False, "options": {"temperature": float(version.temperature)}}
+    body = build_ollama_chat_body(version, payload.input)
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(f"{str(get_settings().ollama_base_url).rstrip('/')}/api/chat", json=body); response.raise_for_status()
