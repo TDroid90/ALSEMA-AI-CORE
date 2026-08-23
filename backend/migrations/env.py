@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config, pool
 from app.config.settings import get_settings
 from app.modules.agents import models as _agent_models  # noqa: F401
 from app.modules.conversations import models as _conversation_models  # noqa: F401
+from app.modules.creative import models as _creative_models  # noqa: F401
 from app.modules.identity.models import Base
 from app.modules.memory import models as _memory_models  # noqa: F401
 from app.modules.plugins import facebook_models as _facebook_models  # noqa: F401

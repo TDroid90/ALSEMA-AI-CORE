@@ -14,6 +14,7 @@ from app.api.access_admin import router as access_router
 from app.api.agents import router as agents_router
 from app.api.audit import router as audit_router
 from app.api.conversations import router as conversations_router
+from app.api.creative import router as creative_router
 from app.api.facebook import router as facebook_router
 from app.api.identity import router as identity_router
 from app.api.instagram import router as instagram_router
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     app.include_router(system_router)
     app.include_router(identity_router)
     app.include_router(conversations_router)
+    app.include_router(creative_router)
     app.include_router(agents_router)
     app.include_router(tasks_router)
     app.include_router(memory_router)

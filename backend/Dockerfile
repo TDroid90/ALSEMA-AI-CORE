@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir --no-deps .
 FROM python:3.12-slim AS runtime
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core libgomp1 && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 10001 appuser
 COPY --from=builder /usr/local /usr/local
 COPY app ./app

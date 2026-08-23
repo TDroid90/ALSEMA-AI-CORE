@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     initial_admin_password: SecretStr = SecretStr("")
     cors_origins: str = "http://localhost:5173"
     tool_sandbox_root: str = "/data/tools"
+    creative_storage_root: str = "/data/creative"
+    creative_text_model: str = "qwen3:8b"
+    comfyui_base_url: str = "http://host.docker.internal:8188"
+    lm_studio_base_url: str = ""
     http_allowed_hosts: str = ""
     http_timeout_seconds: int = Field(default=15, ge=1, le=60)
     http_max_response_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)

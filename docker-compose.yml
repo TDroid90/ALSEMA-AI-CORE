@@ -28,9 +28,10 @@ services:
 
   tools-init:
     image: busybox:1.37
-    command: ["sh", "-c", "mkdir -p /data/tools && chown -R 10001:10001 /data/tools"]
+    command: ["sh", "-c", "mkdir -p /data/tools /data/creative && chown -R 10001:10001 /data/tools /data/creative"]
     volumes:
       - tools_data:/data/tools
+      - creative_data:/data/creative
 
   docker-proxy:
     image: tecnativa/docker-socket-proxy:0.3.0
@@ -63,6 +64,7 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - tools_data:/data/tools
+      - creative_data:/data/creative
 
   worker:
     build: ./backend
@@ -75,6 +77,7 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - tools_data:/data/tools
+      - creative_data:/data/creative
 
   frontend:
     build: ./frontend
@@ -86,3 +89,4 @@ volumes:
   postgres_data:
   redis_data:
   tools_data:
+  creative_data:

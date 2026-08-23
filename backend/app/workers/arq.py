@@ -10,6 +10,9 @@ from app.modules.tasks.models import Task
 from app.modules.workflows.models import WorkflowRun, WorkflowSchedule
 from app.shared.database import SessionFactory
 from app.workers.jobs import (
+    generate_creative,
+    import_creativosur_data,
+    prepare_creative_cutout,
     prepare_facebook_media,
     prepare_instagram_media,
     publish_facebook_media,
@@ -27,6 +30,9 @@ def recoverable_task_job(task_type: str) -> str | None:
         "system.sleep": "run_sleep_task",
         "instagram.media.prepare": "prepare_instagram_media",
         "facebook.media.prepare": "prepare_facebook_media",
+        "creative.generate": "generate_creative",
+        "creative.import": "import_creativosur_data",
+        "creative.cutout": "prepare_creative_cutout",
     }.get(task_type)
 
 
@@ -37,7 +43,9 @@ async def recover_interrupted_work(redis: Any) -> None:
         tasks = (
             await session.scalars(
                 select(Task).where(
-                    Task.status.in_({"running", "uploading", "processing", "publishing", "cancelling"})
+                    Task.status.in_(
+                        {"running", "uploading", "processing", "publishing", "cancelling"}
+                    )
                 )
             )
         ).all()
@@ -56,7 +64,9 @@ async def recover_interrupted_work(redis: Any) -> None:
             task.status = "queued"
             task.progress_message = "Recuperada después del reinicio del worker"
             task_jobs.append((job_name, str(task.id)))
-        runs = (await session.scalars(select(WorkflowRun).where(WorkflowRun.status == "running"))).all()
+        runs = (
+            await session.scalars(select(WorkflowRun).where(WorkflowRun.status == "running"))
+        ).all()
         for run in runs:
             run.status = "queued"
             run.error = None
@@ -96,10 +106,14 @@ async def dispatch_due_schedules(ctx: dict[str, Any]) -> None:
 
 async def heartbeat(ctx: dict[str, Any]) -> None:
     await ctx["redis"].set("aas:worker:heartbeat", datetime.now(UTC).isoformat(), ex=30)
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     ctx["redis"] = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
     await recover_interrupted_work(ctx["redis"])
     await heartbeat(ctx)
+
+
 class WorkerSettings:
     functions = [
         run_smoke_task,
@@ -110,7 +124,13 @@ class WorkerSettings:
         publish_instagram_media,
         prepare_facebook_media,
         publish_facebook_media,
+        generate_creative,
+        import_creativosur_data,
+        prepare_creative_cutout,
     ]
-    cron_jobs = [cron(heartbeat, second={0, 10, 20, 30, 40, 50}), cron(dispatch_due_schedules, second={0, 10, 20, 30, 40, 50})]
+    cron_jobs = [
+        cron(heartbeat, second={0, 10, 20, 30, 40, 50}),
+        cron(dispatch_due_schedules, second={0, 10, 20, 30, 40, 50}),
+    ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
