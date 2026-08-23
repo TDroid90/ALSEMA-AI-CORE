@@ -31,4 +31,12 @@ test("opens the native styled creative workspace in the ALSEMA session", async (
     "background-color",
     "rgb(0, 194, 255)",
   );
+
+  await page.getByRole("button", { name: /Producción/ }).click();
+  await expect(page.getByRole("button", { name: "Aprobar producción" })).toBeVisible();
+  await expect(page.locator(".creative-assets img")).toHaveCount(3);
+
+  await page.getByRole("button", { name: "Editor de plantillas" }).click();
+  await expect(page.getByRole("heading", { name: "Editor profesional" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Exportar PNG" })).toBeVisible();
 });
