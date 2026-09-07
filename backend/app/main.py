@@ -18,6 +18,7 @@ from app.api.creative import router as creative_router
 from app.api.facebook import router as facebook_router
 from app.api.identity import router as identity_router
 from app.api.instagram import router as instagram_router
+from app.api.instanews import router as instanews_router
 from app.api.memory import router as memory_router
 from app.api.models import router as models_router
 from app.api.plugins import router as plugins_router
@@ -27,6 +28,7 @@ from app.api.tools import router as tools_router
 from app.api.workflows import router as workflows_router
 from app.config.settings import get_settings
 from app.modules.identity.bootstrap import bootstrap_initial_admin
+from app.modules.instanews.bootstrap import bootstrap_instanews_templates
 from app.modules.plugins.instagram_bootstrap import bootstrap_instagram_account
 
 logger = logging.getLogger("alsema.api")
@@ -92,6 +94,7 @@ class RequestSizeMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await bootstrap_initial_admin(get_settings())
     await bootstrap_instagram_account(get_settings())
+    await bootstrap_instanews_templates()
     yield
 
 
@@ -112,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(workflows_router)
     app.include_router(plugins_router)
     app.include_router(instagram_router)
+    app.include_router(instanews_router)
     app.include_router(facebook_router)
     app.include_router(tools_router)
     app.include_router(models_router)

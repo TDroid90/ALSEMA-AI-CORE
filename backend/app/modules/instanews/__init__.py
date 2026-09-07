@@ -1,0 +1,1 @@
+"""InstaNews social publishing integration."""
