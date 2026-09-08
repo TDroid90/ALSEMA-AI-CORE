@@ -25,3 +25,10 @@ class InstaNewsRenderedAsset(BaseModel):
     template_id: str
     template_version: str
     text_fit: dict[str, int | bool]
+
+
+class InstaNewsSocialPublishRequest(BaseModel):
+    news_id: str = Field(min_length=1, max_length=180)
+    title: str = Field(min_length=1, max_length=500)
+    caption: str = Field(min_length=1, max_length=5000)
+    feed_image_url: HttpUrl
