@@ -33,6 +33,10 @@ test("shows secure Instagram configuration and a ready container without publish
   await expect(page.getByRole("heading", { name: "Instagram Publisher" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Probar conexión" })).toBeVisible();
   await expect(page.getByLabel("Access Token")).toHaveAttribute("type", "password");
+  const apiVersion = page.getByLabel("Versión de API");
+  await apiVersion.fill("v25.0");
+  await expect(apiVersion).toHaveAttribute("pattern", "v[0-9]+[.][0-9]+");
+  expect(await apiVersion.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
   await expect(page.getByText("Resumen periodístico de prueba")).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirmar y publicar" })).toBeVisible();
   expect(publishCalls).toBe(0);
