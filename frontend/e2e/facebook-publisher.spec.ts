@@ -32,6 +32,10 @@ test("shows Facebook feed and story publishing with Spanish text", async ({ page
 
   await expect(page.getByRole("heading", { name: "Facebook Publisher" })).toBeVisible();
   await expect(page.getByLabel("Page Access Token")).toHaveAttribute("type", "password");
+  const apiVersion = page.getByLabel("Versión de API");
+  await apiVersion.fill("v26.0");
+  await expect(apiVersion).toHaveAttribute("pattern", "v[0-9]+[.][0-9]+");
+  expect(await apiVersion.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
   await expect(page.getByText("Última información: educación, economía y acción 🇦🇷")).toBeVisible();
   await expect(page.getByText("Historia", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirmar y publicar" })).toBeVisible();
