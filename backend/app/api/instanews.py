@@ -83,7 +83,8 @@ async def _latest_template(session: AsyncSession, output: str) -> tuple[Creative
     if record is None:
         raise HTTPException(status_code=503, detail=f"Falta la plantilla publicada {definition['name']}.")
     document = json.loads(record.document_json)
-    return record, document.get("instanews") or definition
+    stored = document.get("instanews") or {}
+    return record, {**definition, **stored}
 
 
 async def _instanews_account(session: AsyncSession, model: type[FacebookAccount] | type[InstagramAccount]):
@@ -184,7 +185,15 @@ async def generate_instanews_social_assets(
     rendered = []
     for output in dict.fromkeys(payload.outputs):
         record, definition = await _latest_template(session, output)
-        png, text_fit = render_social_asset(image, payload.title, payload.summary, payload.category, definition, payload.city)
+        png, text_fit = render_social_asset(
+            image,
+            payload.title,
+            payload.summary,
+            payload.category,
+            definition,
+            payload.city,
+            str(payload.article_url),
+        )
         rendered.append(
             {
                 "output": output,

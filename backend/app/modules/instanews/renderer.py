@@ -33,6 +33,33 @@ def _wrap(draw: ImageDraw.ImageDraw, value: str, font: ImageFont.FreeTypeFont, m
     lines: list[str] = []
     current = ""
     for word in words:
+        if draw.textlength(word, font=font) > max_width:
+            if current:
+                lines.append(current)
+                current = ""
+            remaining = word
+            while remaining:
+                low, high = 1, len(remaining)
+                while low < high:
+                    middle = (low + high + 1) // 2
+                    if draw.textlength(remaining[:middle], font=font) <= max_width:
+                        low = middle
+                    else:
+                        high = middle - 1
+                if low < len(remaining):
+                    natural_break = max(
+                        (remaining.rfind(separator, 0, low) + 1 for separator in "/-_?&="),
+                        default=0,
+                    )
+                    if natural_break >= max(1, round(low * 0.55)):
+                        low = natural_break
+                chunk = remaining[:low]
+                remaining = remaining[low:]
+                if remaining:
+                    lines.append(chunk)
+                else:
+                    current = chunk
+            continue
         candidate = f"{current} {word}".strip()
         if not current or draw.textlength(candidate, font=font) <= max_width:
             current = candidate
@@ -120,6 +147,7 @@ def render_social_asset(
     category: str,
     template: dict[str, Any],
     city: str | None = None,
+    article_url: str | None = None,
 ) -> tuple[bytes, dict[str, int | bool]]:
     width, height = int(template["width"]), int(template["height"])
     safe, content, logo_config = template["safe_area"], template["content"], template["logo"]
@@ -181,14 +209,44 @@ def render_social_asset(
     _draw_lines(canvas, title_fit.lines, (x, title_top), _font(title_fit.font_size, "extra_bold"), title_fit.line_height)
     _draw_lines(canvas, summary_fit.lines, (x, summary_top), _font(summary_fit.font_size, "medium"), summary_fit.line_height)
 
-    badge_size = int(logo_config["badge_size"])
+    link_config = template.get("story_link")
+    if link_config and article_url:
+        link_fit = fit_text(
+            article_url,
+            content_width,
+            int(link_config["max_lines"]),
+            int(link_config["font_size"]),
+            int(link_config["minimum_font_size"]),
+            float(link_config["line_height"]),
+            "medium",
+        )
+        link_top = height - int(safe["bottom"]) + int(link_config["offset_top"])
+        link_font = _font(link_fit.font_size, "medium")
+        link_shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        link_shadow_draw = ImageDraw.Draw(link_shadow)
+        for index, line in enumerate(link_fit.lines):
+            y = link_top + index * link_fit.line_height
+            link_shadow_draw.text((x, y + 2), line, font=link_font, fill=(0, 0, 0, 220))
+        canvas.alpha_composite(link_shadow.filter(ImageFilter.GaussianBlur(3)))
+        draw = ImageDraw.Draw(canvas)
+        for index, line in enumerate(link_fit.lines):
+            draw.text(
+                (x, link_top + index * link_fit.line_height),
+                line,
+                font=link_font,
+                fill=str(link_config["color"]),
+            )
+
+    logo_scale = float(logo_config.get("scale", 0.7))
+    badge_size = round(int(logo_config["badge_size"]) * logo_scale)
     badge_x = width - int(logo_config["margin_right"]) - badge_size
     badge_y = int(logo_config["margin_top"])
     draw = ImageDraw.Draw(canvas)
     draw.ellipse((badge_x, badge_y, badge_x + badge_size, badge_y + badge_size), fill=(13, 27, 42, 235), outline=(255, 255, 255, 165), width=2)
     with Image.open(ASSETS / "instanews-isotype.png") as logo:
         mark = logo.convert("RGBA")
-        mark.thumbnail((int(logo_config["logo_max_width"]), int(logo_config["logo_max_width"])), Image.Resampling.LANCZOS)
+        logo_max_width = round(int(logo_config["logo_max_width"]) * logo_scale)
+        mark.thumbnail((logo_max_width, logo_max_width), Image.Resampling.LANCZOS)
         canvas.alpha_composite(mark, (badge_x + (badge_size - mark.width) // 2, badge_y + (badge_size - mark.height) // 2))
 
     output = BytesIO()
