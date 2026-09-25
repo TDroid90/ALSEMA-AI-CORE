@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 from app.modules.plugins.instagram_models import InstagramAccount
 from app.shared.secrets import SecretCipher
 
-INSTAGRAM_GRAPH_HOST = "https://graph.instagram.com"
+INSTAGRAM_LOGIN_GRAPH_HOST = "https://graph.instagram.com"
+FACEBOOK_GRAPH_HOST = "https://graph.facebook.com"
 SECRET_KEYS = {"access_token", "app_secret", "token", "client_secret"}
 
 
@@ -66,47 +67,62 @@ class InstagramPublisherPlugin:
         params: dict[str, str] | None = None,
         payload: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        url = f"{INSTAGRAM_GRAPH_HOST}/{credentials.api_version}/{path.lstrip('/')}"
         headers = {"Authorization": f"Bearer {credentials.access_token}"}
-        try:
-            async with httpx.AsyncClient(
-                transport=self._transport,
-                timeout=self._timeout,
-                follow_redirects=False,
-            ) as client:
-                response = await client.request(
-                    method,
-                    url,
-                    params=params,
-                    json=payload,
-                    headers={**headers, "Content-Type": "application/json; charset=utf-8"},
-                )
-        except httpx.HTTPError as exc:
-            raise InstagramAPIError("No se pudo conectar con Instagram.") from exc
-        try:
-            body = response.json()
-        except ValueError:
-            body = {"message": "Instagram devolvió una respuesta no JSON."}
-        safe_body = sanitize_instagram_payload(body, (credentials.access_token, credentials.app_secret))
-        if not response.is_success:
+        last_error: InstagramAPIError | None = None
+        # Instagram Login tokens use graph.instagram.com. Page access tokens obtained
+        # through Facebook Login use graph.facebook.com for the same publishing API.
+        for host in (INSTAGRAM_LOGIN_GRAPH_HOST, FACEBOOK_GRAPH_HOST):
+            url = f"{host}/{credentials.api_version}/{path.lstrip('/')}"
+            try:
+                async with httpx.AsyncClient(
+                    transport=self._transport,
+                    timeout=self._timeout,
+                    follow_redirects=False,
+                ) as client:
+                    response = await client.request(
+                        method,
+                        url,
+                        params=params,
+                        json=payload,
+                        headers={**headers, "Content-Type": "application/json; charset=utf-8"},
+                    )
+            except httpx.HTTPError:
+                last_error = InstagramAPIError("No se pudo conectar con Instagram.")
+                continue
+            try:
+                body = response.json()
+            except ValueError:
+                body = {"message": "Instagram devolvió una respuesta no JSON."}
+            safe_body = sanitize_instagram_payload(body, (credentials.access_token, credentials.app_secret))
+            if response.is_success:
+                if not isinstance(safe_body, dict):
+                    raise InstagramAPIError("Instagram devolvió una respuesta inesperada.")
+                return safe_body
             error = safe_body.get("error", safe_body) if isinstance(safe_body, dict) else {}
             message = error.get("message", "Instagram rechazó la solicitud.") if isinstance(error, dict) else "Instagram rechazó la solicitud."
-            raise InstagramAPIError(str(message), status_code=response.status_code, details=error if isinstance(error, dict) else {})
-        if not isinstance(safe_body, dict):
-            raise InstagramAPIError("Instagram devolvió una respuesta inesperada.")
-        return safe_body
+            last_error = InstagramAPIError(
+                str(message),
+                status_code=response.status_code,
+                details=error if isinstance(error, dict) else {},
+            )
+        if last_error is not None:
+            raise last_error
+        raise InstagramAPIError("No se pudo conectar con Instagram.")
 
     async def test_connection(self, credentials: InstagramCredentials) -> dict[str, object]:
         profile = await self._request(
             "GET",
             credentials,
             credentials.instagram_user_id,
-            params={"fields": "id,username,account_type"},
+            # ``account_type`` is not exposed by the Instagram Graph API when
+            # authenticating with a Facebook Page access token (Meta v26).
+            # Keep the shared probe compatible with both supported login modes.
+            params={"fields": "id,username"},
         )
         return {
             "id": str(profile.get("id", credentials.instagram_user_id)),
             "username": str(profile.get("username", "")),
-            "account_type": str(profile.get("account_type", "")),
+            "account_type": str(profile.get("account_type", "BUSINESS")),
             "connection_status": "connected",
         }
 

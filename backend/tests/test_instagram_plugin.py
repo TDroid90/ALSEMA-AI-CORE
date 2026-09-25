@@ -29,7 +29,7 @@ def credentials() -> InstagramCredentials:
 async def test_connection_returns_profile_without_exposing_token() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v23.0/17841400000000000"
-        assert request.url.params["fields"] == "id,username,account_type"
+        assert request.url.params["fields"] == "id,username"
         assert request.headers["authorization"] == "Bearer test-access-token"
         assert "access_token" not in str(request.url)
         return httpx.Response(
@@ -46,6 +46,27 @@ async def test_connection_returns_profile_without_exposing_token() -> None:
         "connection_status": "connected",
     }
     assert "test-access-token" not in json.dumps(result)
+
+
+@pytest.mark.asyncio
+async def test_connection_falls_back_to_facebook_graph_for_a_page_access_token() -> None:
+    requested_hosts: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        if request.url.host == "graph.instagram.com":
+            return httpx.Response(400, json={"error": {"message": "Invalid OAuth token"}})
+        assert request.url.host == "graph.facebook.com"
+        return httpx.Response(
+            200,
+            json={"id": "17841400000000000", "username": "page_connected_account"},
+        )
+
+    result = await InstagramPublisherPlugin(transport=httpx.MockTransport(handler)).test_connection(credentials())
+
+    assert result["username"] == "page_connected_account"
+    assert result["account_type"] == "BUSINESS"
+    assert requested_hosts == ["graph.instagram.com", "graph.facebook.com"]
 
 
 @pytest.mark.asyncio
