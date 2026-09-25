@@ -1,7 +1,7 @@
 from typing import Any
 
 TEMPLATE_FAMILY = "instanews_social_publication"
-TEMPLATE_VERSION = "1.1.0"
+TEMPLATE_VERSION = "1.2.0"
 
 OUTPUT_TEMPLATES: dict[str, dict[str, Any]] = {
     "story": {
@@ -18,6 +18,7 @@ OUTPUT_TEMPLATES: dict[str, dict[str, Any]] = {
             "category_padding_x": 20,
             "category_padding_y": 10,
             "category_radius": 12,
+            "category_gap": 12,
             "title_max": 82,
             "title_min": 58,
             "title_lines": 4,
@@ -44,6 +45,7 @@ OUTPUT_TEMPLATES: dict[str, dict[str, Any]] = {
             "category_padding_x": 18,
             "category_padding_y": 9,
             "category_radius": 11,
+            "category_gap": 12,
             "title_max": 68,
             "title_min": 48,
             "title_lines": 3,

@@ -16,6 +16,7 @@ def test_instanews_templates_render_exact_social_sizes() -> None:
             "La iniciativa reúne a autoridades y organizaciones locales con una agenda de trabajo común.",
             "Gobierno",
             template,
+            "San Sebastián",
         )
         with Image.open(BytesIO(rendered)) as image:
             assert image.size == (template["width"], template["height"]), output

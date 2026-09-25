@@ -10,6 +10,7 @@ class InstaNewsSocialAssetRequest(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     summary: str = Field(min_length=1, max_length=2000)
     category: str = Field(default="Actualidad", max_length=120)
+    city: str | None = Field(default=None, max_length=120)
     source: str = Field(default="INSTANEWS", max_length=180)
     image_url: HttpUrl
     article_url: HttpUrl
@@ -32,3 +33,4 @@ class InstaNewsSocialPublishRequest(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     caption: str = Field(min_length=1, max_length=5000)
     feed_image_url: HttpUrl
+    story_image_url: HttpUrl

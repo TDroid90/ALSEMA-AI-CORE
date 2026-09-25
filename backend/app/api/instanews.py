@@ -125,7 +125,9 @@ def _target_payload(publication: FacebookPublication | InstagramPublication | No
 async def _serialize_dispatch(session: AsyncSession, dispatch: InstaNewsSocialDispatch) -> dict[str, object]:
     facebook = await session.get(FacebookPublication, dispatch.facebook_publication_id) if dispatch.facebook_publication_id else None
     instagram = await session.get(InstagramPublication, dispatch.instagram_publication_id) if dispatch.instagram_publication_id else None
-    targets = [_target_payload(facebook), _target_payload(instagram)]
+    facebook_story = await session.get(FacebookPublication, dispatch.facebook_story_publication_id) if dispatch.facebook_story_publication_id else None
+    instagram_story = await session.get(InstagramPublication, dispatch.instagram_story_publication_id) if dispatch.instagram_story_publication_id else None
+    targets = [_target_payload(facebook), _target_payload(instagram), _target_payload(facebook_story), _target_payload(instagram_story)]
     statuses = [str(target["status"]) for target in targets]
     if all(status == "published" for status in statuses):
         dispatch.status, dispatch.error = "published", None
@@ -144,6 +146,8 @@ async def _serialize_dispatch(session: AsyncSession, dispatch: InstaNewsSocialDi
         "error": dispatch.error,
         "facebook": targets[0],
         "instagram": targets[1],
+        "facebook_story": targets[2],
+        "instagram_story": targets[3],
         "created_at": dispatch.created_at.isoformat(),
         "updated_at": dispatch.updated_at.isoformat(),
     }
@@ -180,7 +184,7 @@ async def generate_instanews_social_assets(
     rendered = []
     for output in dict.fromkeys(payload.outputs):
         record, definition = await _latest_template(session, output)
-        png, text_fit = render_social_asset(image, payload.title, payload.summary, payload.category, definition)
+        png, text_fit = render_social_asset(image, payload.title, payload.summary, payload.category, definition, payload.city)
         rendered.append(
             {
                 "output": output,
@@ -245,6 +249,7 @@ async def publish_instanews_social(
         dispatch.title = payload.title
         dispatch.caption = payload.caption
         dispatch.feed_image_url = str(payload.feed_image_url)
+        dispatch.story_image_url = str(payload.story_image_url)
         dispatch.attempts += 1
         dispatch.status = "queued"
         dispatch.error = None
@@ -254,6 +259,7 @@ async def publish_instanews_social(
             title=payload.title,
             caption=payload.caption,
             feed_image_url=str(payload.feed_image_url),
+            story_image_url=str(payload.story_image_url),
             status="queued",
             attempts=1,
         )
@@ -271,6 +277,8 @@ async def publish_instanews_social(
 
     previous_facebook = await session.get(FacebookPublication, dispatch.facebook_publication_id) if dispatch.facebook_publication_id else None
     previous_instagram = await session.get(InstagramPublication, dispatch.instagram_publication_id) if dispatch.instagram_publication_id else None
+    previous_facebook_story = await session.get(FacebookPublication, dispatch.facebook_story_publication_id) if dispatch.facebook_story_publication_id else None
+    previous_instagram_story = await session.get(InstagramPublication, dispatch.instagram_story_publication_id) if dispatch.instagram_story_publication_id else None
     jobs: list[tuple[str, Task, FacebookPublication | InstagramPublication]] = []
 
     if previous_facebook is None or previous_facebook.status == "failed":
@@ -305,13 +313,45 @@ async def publish_instanews_social(
         dispatch.instagram_publication_id = publication.id
         jobs.append(("prepare_instagram_media", task, publication))
 
+    if previous_facebook_story is None or previous_facebook_story.status == "failed":
+        publication = FacebookPublication(
+            account_id=facebook_account.id,
+            requested_by_user_id=user.id,
+            placement="story",
+            caption=payload.caption,
+            image_url=str(payload.story_image_url),
+            status="queued",
+        )
+        task = Task(type="facebook.media.prepare", owner_user_id=user.id, status="queued", progress_total=2, progress_message="Historia INSTANEWS en cola")
+        session.add_all([publication, task])
+        await session.flush()
+        task.result = str(publication.id)
+        dispatch.facebook_story_publication_id = publication.id
+        jobs.append(("prepare_facebook_media", task, publication))
+
+    if previous_instagram_story is None or previous_instagram_story.status == "failed":
+        publication = InstagramPublication(
+            account_id=instagram_account.id,
+            requested_by_user_id=user.id,
+            placement="story",
+            caption=payload.caption,
+            image_url=str(payload.story_image_url),
+            status="queued",
+        )
+        task = Task(type="instagram.media.prepare", owner_user_id=user.id, status="queued", progress_total=3, progress_message="Historia INSTANEWS en cola")
+        session.add_all([publication, task])
+        await session.flush()
+        task.result = str(publication.id)
+        dispatch.instagram_story_publication_id = publication.id
+        jobs.append(("prepare_instagram_media", task, publication))
+
     await record_audit(
         session,
         user.id,
         "instanews.social_publish.queued",
         "instanews_social_dispatch",
         str(dispatch.id),
-        {"news_id": payload.news_id, "attempt": dispatch.attempts},
+        {"news_id": payload.news_id, "attempt": dispatch.attempts, "targets": ["facebook_feed", "facebook_story", "instagram_feed", "instagram_story"]},
     )
     await session.commit()
 

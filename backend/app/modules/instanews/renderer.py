@@ -113,7 +113,14 @@ def _draw_lines(canvas: Image.Image, lines: list[str], position: tuple[int, int]
         draw.text((x, y + index * line_height), line, font=font, fill="white")
 
 
-def render_social_asset(image_bytes: bytes, title: str, summary: str, category: str, template: dict[str, Any]) -> tuple[bytes, dict[str, int | bool]]:
+def render_social_asset(
+    image_bytes: bytes,
+    title: str,
+    summary: str,
+    category: str,
+    template: dict[str, Any],
+    city: str | None = None,
+) -> tuple[bytes, dict[str, int | bool]]:
     width, height = int(template["width"]), int(template["height"])
     safe, content, logo_config = template["safe_area"], template["content"], template["logo"]
     canvas = _cover(image_bytes, (width, height)).convert("RGBA")
@@ -145,15 +152,32 @@ def render_social_asset(image_bytes: bytes, title: str, summary: str, category: 
     draw = ImageDraw.Draw(canvas)
     category_font = _font(int(content["category_font_size"]), "medium")
     category_value = _clean(category) or "Actualidad"
+    city_value = _clean(city or "")
     text_box = draw.textbbox((0, 0), category_value, font=category_font)
     chip_width = min(content_width, text_box[2] - text_box[0] + int(content["category_padding_x"]) * 2)
     chip_height = int(content["category_font_size"]) + int(content["category_padding_y"]) * 2
-    chip_top = title_top - int(content["title_margin_top"]) - chip_height
+    chip_gap = int(content.get("category_gap", 12))
+    city_width = 0
+    if city_value:
+        city_box = draw.textbbox((0, 0), city_value, font=category_font)
+        city_width = min(content_width, city_box[2] - city_box[0] + int(content["category_padding_x"]) * 2)
+    chips_wrap = bool(city_width and chip_width + chip_gap + city_width > content_width)
+    chip_rows = 2 if chips_wrap else 1
+    chip_top = title_top - int(content["title_margin_top"]) - chip_height * chip_rows - chip_gap * (chip_rows - 1)
     if chip_top < int(safe["top"]):
         raise ValueError("El texto excede el área segura de la plantilla")
     x = int(safe["left"])
     draw.rounded_rectangle((x, chip_top, x + chip_width, chip_top + chip_height), radius=int(content["category_radius"]), fill="#ffc107")
     draw.text((x + chip_width / 2, chip_top + chip_height / 2), category_value, font=category_font, fill="#06111f", anchor="mm")
+    if city_width:
+        city_x = x if chips_wrap else x + chip_width + chip_gap
+        city_top = chip_top + chip_height + chip_gap if chips_wrap else chip_top
+        draw.rounded_rectangle(
+            (city_x, city_top, city_x + city_width, city_top + chip_height),
+            radius=int(content["category_radius"]),
+            fill="#31d7ed",
+        )
+        draw.text((city_x + city_width / 2, city_top + chip_height / 2), city_value, font=category_font, fill="#06111f", anchor="mm")
     _draw_lines(canvas, title_fit.lines, (x, title_top), _font(title_fit.font_size, "extra_bold"), title_fit.line_height)
     _draw_lines(canvas, summary_fit.lines, (x, summary_top), _font(summary_fit.font_size, "medium"), summary_fit.line_height)
 
