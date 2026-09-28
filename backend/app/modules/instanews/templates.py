@@ -12,14 +12,6 @@ OUTPUT_TEMPLATES: dict[str, dict[str, Any]] = {
         "height": 1920,
         "safe_area": {"top": 160, "bottom": 220, "left": 80, "right": 80},
         "logo": {"badge_size": 170, "logo_max_width": 120, "margin_top": 160, "margin_right": 80, "scale": 0.7},
-        "story_link": {
-            "font_size": 22,
-            "minimum_font_size": 18,
-            "max_lines": 2,
-            "line_height": 1.18,
-            "offset_top": 28,
-            "color": "#31d7ed",
-        },
         "content": {
             "margin_bottom": 220,
             "category_font_size": 28,
@@ -143,33 +135,5 @@ def editor_document(output: str) -> dict[str, Any]:
                 "lineHeight": template["content"]["summary_line_height"],
                 "letterSpacing": 0,
             },
-        ]
-        + (
-            [
-                {
-                    "id": "story-article-link",
-                    "type": "text",
-                    "name": "Enlace dinámico de la nota",
-                    "x": template["safe_area"]["left"],
-                    "y": template["height"] - template["safe_area"]["bottom"] + template["story_link"]["offset_top"],
-                    "width": template["width"] - template["safe_area"]["left"] - template["safe_area"]["right"],
-                    "height": 80,
-                    "rotation": 0,
-                    "opacity": 1,
-                    "visible": True,
-                    "locked": True,
-                    "z": 4,
-                    "text": "https://instanews.news/noticias/enlace-de-la-nota",
-                    "fontFamily": "Montserrat",
-                    "fontSize": template["story_link"]["font_size"],
-                    "fontWeight": 500,
-                    "color": template["story_link"]["color"],
-                    "textAlign": "left",
-                    "lineHeight": template["story_link"]["line_height"],
-                    "letterSpacing": 0,
-                }
-            ]
-            if output == "story"
-            else []
-        ),
+        ],
     }

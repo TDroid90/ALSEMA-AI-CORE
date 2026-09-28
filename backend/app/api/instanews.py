@@ -138,19 +138,26 @@ async def _serialize_dispatch(session: AsyncSession, dispatch: InstaNewsSocialDi
         dispatch.status, dispatch.error = "failed", "No se pudo completar la publicación."
     elif any(status == "processing" for status in statuses):
         dispatch.status, dispatch.error = "processing", None
+    await session.flush()
+    created_at = dispatch.created_at.isoformat()
+    updated_at = dispatch.updated_at.isoformat()
+    news_id = dispatch.news_id
+    attempts = dispatch.attempts
+    status = dispatch.status
+    error = dispatch.error
     await session.commit()
     return {
         "provider": "alsema",
-        "news_id": dispatch.news_id,
-        "status": dispatch.status,
-        "attempts": dispatch.attempts,
-        "error": dispatch.error,
+        "news_id": news_id,
+        "status": status,
+        "attempts": attempts,
+        "error": error,
         "facebook": targets[0],
         "instagram": targets[1],
         "facebook_story": targets[2],
         "instagram_story": targets[3],
-        "created_at": dispatch.created_at.isoformat(),
-        "updated_at": dispatch.updated_at.isoformat(),
+        "created_at": created_at,
+        "updated_at": updated_at,
     }
 
 
@@ -192,7 +199,6 @@ async def generate_instanews_social_assets(
             payload.category,
             definition,
             payload.city,
-            str(payload.article_url),
         )
         rendered.append(
             {
