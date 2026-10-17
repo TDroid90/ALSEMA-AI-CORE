@@ -119,6 +119,7 @@ def _overlay(size: tuple[int, int]) -> Image.Image:
     width, height = size
     gradient = Image.new("L", (1, height))
     pixels = gradient.load()
+    assert pixels is not None
     stops = [(0.0, 0), (0.38, 82), (0.65, 184), (1.0, 224)]
     for y in range(height):
         position = y / max(1, height - 1)
@@ -202,11 +203,11 @@ def render_social_asset(
     chip_gap = int(content.get("category_gap", 12))
     for label in labels:
         text_box = draw.textbbox((0, 0), label, font=category_font)
-        chip_width = min(content_width, text_box[2] - text_box[0] + int(content["category_padding_x"]) * 2)
+        chip_width = int(min(content_width, text_box[2] - text_box[0] + int(content["category_padding_x"]) * 2))
         if row_width and row_width + chip_gap + chip_width > content_width:
             row += 1
             row_width = 0
-        offset = row_width + (chip_gap if row_width else 0)
+        offset = int(row_width + (chip_gap if row_width else 0))
         chips.append((label, chip_width, offset, row))
         row_width = offset + chip_width
     chip_top = title_top - int(content["title_margin_top"]) - chip_height * (row + 1) - chip_gap * row

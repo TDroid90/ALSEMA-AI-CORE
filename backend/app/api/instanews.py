@@ -3,6 +3,7 @@ import base64
 import ipaddress
 import json
 import socket
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -84,7 +85,7 @@ async def _fetch_image(url: str) -> bytes:
     raise HTTPException(status_code=422, detail="Demasiadas redirecciones de imagen.")
 
 
-async def _latest_template(session: AsyncSession, output: str) -> tuple[CreativeTemplate, dict]:
+async def _latest_template(session: AsyncSession, output: str) -> tuple[CreativeTemplate, dict[str, Any]]:
     definition = OUTPUT_TEMPLATES[output]
     record = await session.scalar(
         select(CreativeTemplate)
@@ -98,7 +99,10 @@ async def _latest_template(session: AsyncSession, output: str) -> tuple[Creative
     return record, {**definition, **stored}
 
 
-async def _instanews_account(session: AsyncSession, model: type[FacebookAccount] | type[InstagramAccount]):
+async def _instanews_account(
+    session: AsyncSession,
+    model: type[FacebookAccount] | type[InstagramAccount],
+) -> FacebookAccount | InstagramAccount | None:
     return await session.scalar(
         select(model)
         .where(
@@ -341,7 +345,7 @@ async def publish_instanews_social(
     jobs: list[tuple[str, Task, FacebookPublication | InstagramPublication]] = []
 
     if previous_facebook is None or previous_facebook.status == "failed":
-        publication = FacebookPublication(
+        fb_publication = FacebookPublication(
             account_id=facebook_account.id,
             requested_by_user_id=user.id,
             placement="feed",
@@ -350,14 +354,14 @@ async def publish_instanews_social(
             status="queued",
         )
         task = Task(type="facebook.media.prepare", owner_user_id=user.id, status="queued", progress_total=2, progress_message="Publicación INSTANEWS en cola")
-        session.add_all([publication, task])
+        session.add_all([fb_publication, task])
         await session.flush()
-        task.result = str(publication.id)
-        dispatch.facebook_publication_id = publication.id
-        jobs.append(("prepare_facebook_media", task, publication))
+        task.result = str(fb_publication.id)
+        dispatch.facebook_publication_id = fb_publication.id
+        jobs.append(("prepare_facebook_media", task, fb_publication))
 
     if previous_instagram is None or previous_instagram.status == "failed":
-        publication = InstagramPublication(
+        ig_publication = InstagramPublication(
             account_id=instagram_account.id,
             requested_by_user_id=user.id,
             placement="feed",
@@ -366,14 +370,14 @@ async def publish_instanews_social(
             status="queued",
         )
         task = Task(type="instagram.media.prepare", owner_user_id=user.id, status="queued", progress_total=3, progress_message="Publicación INSTANEWS en cola")
-        session.add_all([publication, task])
+        session.add_all([ig_publication, task])
         await session.flush()
-        task.result = str(publication.id)
-        dispatch.instagram_publication_id = publication.id
-        jobs.append(("prepare_instagram_media", task, publication))
+        task.result = str(ig_publication.id)
+        dispatch.instagram_publication_id = ig_publication.id
+        jobs.append(("prepare_instagram_media", task, ig_publication))
 
     if previous_facebook_story is None or previous_facebook_story.status == "failed":
-        publication = FacebookPublication(
+        fb_story_publication = FacebookPublication(
             account_id=facebook_account.id,
             requested_by_user_id=user.id,
             placement="story",
@@ -382,14 +386,14 @@ async def publish_instanews_social(
             status="queued",
         )
         task = Task(type="facebook.media.prepare", owner_user_id=user.id, status="queued", progress_total=2, progress_message="Historia INSTANEWS en cola")
-        session.add_all([publication, task])
+        session.add_all([fb_story_publication, task])
         await session.flush()
-        task.result = str(publication.id)
-        dispatch.facebook_story_publication_id = publication.id
-        jobs.append(("prepare_facebook_media", task, publication))
+        task.result = str(fb_story_publication.id)
+        dispatch.facebook_story_publication_id = fb_story_publication.id
+        jobs.append(("prepare_facebook_media", task, fb_story_publication))
 
     if previous_instagram_story is None or previous_instagram_story.status == "failed":
-        publication = InstagramPublication(
+        ig_story_publication = InstagramPublication(
             account_id=instagram_account.id,
             requested_by_user_id=user.id,
             placement="story",
@@ -398,11 +402,11 @@ async def publish_instanews_social(
             status="queued",
         )
         task = Task(type="instagram.media.prepare", owner_user_id=user.id, status="queued", progress_total=3, progress_message="Historia INSTANEWS en cola")
-        session.add_all([publication, task])
+        session.add_all([ig_story_publication, task])
         await session.flush()
-        task.result = str(publication.id)
-        dispatch.instagram_story_publication_id = publication.id
-        jobs.append(("prepare_instagram_media", task, publication))
+        task.result = str(ig_story_publication.id)
+        dispatch.instagram_story_publication_id = ig_story_publication.id
+        jobs.append(("prepare_instagram_media", task, ig_story_publication))
 
     await record_audit(
         session,
