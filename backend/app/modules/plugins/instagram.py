@@ -29,6 +29,7 @@ class InstagramAPIError(RuntimeError):
 
 class InstagramPublisher(Protocol):
     async def test_connection(self, credentials: InstagramCredentials) -> dict[str, object]: ...
+    async def get_follower_count(self, credentials: InstagramCredentials) -> int: ...
     async def create_image_container(self, credentials: InstagramCredentials, image_url: str, caption: str, placement: str = "feed") -> dict[str, object]: ...
     async def get_container_status(self, credentials: InstagramCredentials, container_id: str) -> dict[str, object]: ...
     async def publish_container(self, credentials: InstagramCredentials, container_id: str) -> dict[str, object]: ...
@@ -125,6 +126,18 @@ class InstagramPublisherPlugin:
             "account_type": str(profile.get("account_type", "BUSINESS")),
             "connection_status": "connected",
         }
+
+    async def get_follower_count(self, credentials: InstagramCredentials) -> int:
+        result = await self._request(
+            "GET",
+            credentials,
+            credentials.instagram_user_id,
+            params={"fields": "followers_count"},
+        )
+        count = result.get("followers_count")
+        if not isinstance(count, int) or count < 0:
+            raise InstagramAPIError("Instagram no devolvió un conteo válido de seguidores.")
+        return count
 
     async def create_image_container(
         self,

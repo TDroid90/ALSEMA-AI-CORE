@@ -28,6 +28,7 @@ class FacebookAPIError(RuntimeError):
 
 class FacebookPublisher(Protocol):
     async def test_connection(self, credentials: FacebookCredentials) -> dict[str, object]: ...
+    async def get_follower_count(self, credentials: FacebookCredentials) -> int: ...
     async def publish_feed_image(self, credentials: FacebookCredentials, image_url: str, caption: str) -> dict[str, object]: ...
     async def upload_story_photo(self, credentials: FacebookCredentials, image_url: str, caption: str) -> dict[str, object]: ...
     async def publish_photo_story(self, credentials: FacebookCredentials, photo_id: str) -> dict[str, object]: ...
@@ -103,6 +104,18 @@ class FacebookPublisherPlugin:
             "link": str(profile.get("link", "")),
             "connection_status": "connected",
         }
+
+    async def get_follower_count(self, credentials: FacebookCredentials) -> int:
+        result = await self._request(
+            "GET",
+            credentials,
+            credentials.page_id,
+            params={"fields": "followers_count"},
+        )
+        count = result.get("followers_count")
+        if not isinstance(count, int) or count < 0:
+            raise FacebookAPIError("Facebook no devolvió un conteo válido de seguidores.")
+        return count
 
     async def publish_feed_image(self, credentials: FacebookCredentials, image_url: str, caption: str) -> dict[str, object]:
         return await self._request(

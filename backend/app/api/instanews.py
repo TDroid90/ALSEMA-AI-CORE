@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import ipaddress
 import json
@@ -26,6 +27,8 @@ from app.modules.instanews.schemas import (
 from app.modules.instanews.templates import OUTPUT_TEMPLATES, TEMPLATE_FAMILY, TEMPLATE_VERSION
 from app.modules.plugins.facebook_models import FacebookAccount, FacebookPublication
 from app.modules.plugins.instagram_models import InstagramAccount, InstagramPublication
+from app.modules.plugins.facebook import FacebookAPIError, FacebookPublisherPlugin, credentials_for_facebook_account
+from app.modules.plugins.instagram import InstagramAPIError, InstagramPublisherPlugin, credentials_for_account
 from app.modules.tasks.models import Task
 from app.shared.database import get_session
 
@@ -139,6 +142,7 @@ async def _serialize_dispatch(session: AsyncSession, dispatch: InstaNewsSocialDi
     elif any(status == "processing" for status in statuses):
         dispatch.status, dispatch.error = "processing", None
     await session.flush()
+    await session.refresh(dispatch)
     created_at = dispatch.created_at.isoformat()
     updated_at = dispatch.updated_at.isoformat()
     news_id = dispatch.news_id
@@ -199,6 +203,7 @@ async def generate_instanews_social_assets(
             payload.category,
             definition,
             payload.city,
+            payload.source,
         )
         rendered.append(
             {
@@ -234,6 +239,37 @@ async def instanews_publishing_status(
         "facebook_label": facebook.account_label if facebook else None,
         "instagram_label": instagram.account_label if instagram else None,
     }
+
+
+@router.get("/follower-counts")
+async def instanews_follower_counts(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_permission("agents:execute")),
+) -> dict[str, object]:
+    del user
+    facebook_account = await _instanews_account(session, FacebookAccount)
+    instagram_account = await _instanews_account(session, InstagramAccount)
+
+    async def count_facebook() -> dict[str, object]:
+        if facebook_account is None:
+            return {"status": "unconfigured", "followers_count": None}
+        try:
+            count = await FacebookPublisherPlugin().get_follower_count(credentials_for_facebook_account(facebook_account))
+            return {"status": "ok", "followers_count": count}
+        except FacebookAPIError as exc:
+            return {"status": "error", "followers_count": None, "error": str(exc)[:240]}
+
+    async def count_instagram() -> dict[str, object]:
+        if instagram_account is None:
+            return {"status": "unconfigured", "followers_count": None}
+        try:
+            count = await InstagramPublisherPlugin().get_follower_count(credentials_for_account(instagram_account))
+            return {"status": "ok", "followers_count": count}
+        except InstagramAPIError as exc:
+            return {"status": "error", "followers_count": None, "error": str(exc)[:240]}
+
+    facebook, instagram = await asyncio.gather(count_facebook(), count_instagram())
+    return {"facebook": facebook, "instagram": instagram}
 
 
 @router.post("/social-publish", status_code=202)

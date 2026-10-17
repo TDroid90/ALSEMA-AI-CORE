@@ -57,3 +57,25 @@ def test_article_link_is_never_rendered() -> None:
 
     assert article_url.encode() not in story
     assert article_url.encode() not in feed
+
+
+def test_senasa_source_adds_label_to_story_and_feed() -> None:
+    source = BytesIO()
+    Image.new("RGB", (1600, 1000), "#55788f").save(source, "JPEG")
+    for template in OUTPUT_TEMPLATES.values():
+        args = (source.getvalue(), "Novedades sanitarias", "Información de interés público.", "Nacionales", template, "Río Grande")
+        ordinary, _ = render_social_asset(*args, "Gobierno TDF")
+        senasa, _ = render_social_asset(*args, "SENASA COMUNICA")
+        assert senasa != ordinary
+        with Image.open(BytesIO(senasa)) as image:
+            assert image.size == (template["width"], template["height"])
+
+
+def test_legacy_judicial_category_renders_as_judiciales() -> None:
+    source = BytesIO()
+    Image.new("RGB", (1600, 1000), "#55788f").save(source, "JPEG")
+    args = (source.getvalue(), "Resolución del tribunal", "Información del expediente.")
+    for template in OUTPUT_TEMPLATES.values():
+        old, _ = render_social_asset(*args, "Judicial", template)
+        canonical, _ = render_social_asset(*args, "Judiciales", template)
+        assert old == canonical
