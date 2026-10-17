@@ -25,6 +25,22 @@ def test_instanews_templates_render_exact_social_sizes() -> None:
         assert fit["summary_lines"] <= template["content"]["summary_lines"]
 
 
+def test_landscape_story_keeps_both_sides_of_source_photo() -> None:
+    source = Image.new("RGB", (1600, 900), "#e62c27")
+    source.paste(Image.new("RGB", (800, 900), "#1eaa5b"), (800, 0))
+    original = BytesIO()
+    source.save(original, "PNG")
+    rendered, _ = render_social_asset(
+        original.getvalue(), "Noticia de prueba", "Bajada breve de prueba.",
+        "Municipales", OUTPUT_TEMPLATES["story"], "Río Grande",
+    )
+    with Image.open(BytesIO(rendered)) as image:
+        left = image.getpixel((120, 500))
+        right = image.getpixel((960, 500))
+        assert left[0] > left[1] * 2
+        assert right[1] > right[0] * 2
+
+
 def test_article_link_is_never_rendered() -> None:
     source = BytesIO()
     Image.new("RGB", (1600, 1000), "#55788f").save(source, "JPEG")

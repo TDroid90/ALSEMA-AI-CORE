@@ -105,7 +105,14 @@ def fit_text(
 
 def _cover(image_bytes: bytes, size: tuple[int, int]) -> Image.Image:
     with Image.open(BytesIO(image_bytes)) as source:
-        return ImageOps.fit(ImageOps.exif_transpose(source).convert("RGB"), size, Image.Resampling.LANCZOS)
+        photo = ImageOps.exif_transpose(source).convert("RGB")
+        if size[1] > size[0] * 1.5 and photo.width > photo.height:
+            canvas = Image.new("RGB", size, "#07111f")
+            visible = ImageOps.contain(photo, (size[0], round(size[1] * 0.58)), Image.Resampling.LANCZOS)
+            top = max(0, (round(size[1] * 0.58) - visible.height) // 2)
+            canvas.paste(visible, ((size[0] - visible.width) // 2, top))
+            return canvas
+        return ImageOps.fit(photo, size, Image.Resampling.LANCZOS)
 
 
 def _overlay(size: tuple[int, int]) -> Image.Image:
