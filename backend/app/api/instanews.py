@@ -3,7 +3,7 @@ import base64
 import ipaddress
 import json
 import socket
-from typing import Any
+from typing import Any, cast, overload
 from urllib.parse import urlparse
 
 import httpx
@@ -99,11 +99,25 @@ async def _latest_template(session: AsyncSession, output: str) -> tuple[Creative
     return record, {**definition, **stored}
 
 
+@overload
+async def _instanews_account(
+    session: AsyncSession,
+    model: type[FacebookAccount],
+) -> FacebookAccount | None: ...
+
+
+@overload
+async def _instanews_account(
+    session: AsyncSession,
+    model: type[InstagramAccount],
+) -> InstagramAccount | None: ...
+
+
 async def _instanews_account(
     session: AsyncSession,
     model: type[FacebookAccount] | type[InstagramAccount],
 ) -> FacebookAccount | InstagramAccount | None:
-    return await session.scalar(
+    result = await session.scalar(
         select(model)
         .where(
             model.account_label.ilike("%instanews%"),
@@ -112,6 +126,7 @@ async def _instanews_account(
         )
         .order_by(model.updated_at.desc())
     )
+    return cast(FacebookAccount | InstagramAccount | None, result)
 
 
 def _target_payload(publication: FacebookPublication | InstagramPublication | None) -> dict[str, object]:
