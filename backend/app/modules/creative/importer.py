@@ -42,7 +42,7 @@ def _copy_tree(source: Path, destination: Path) -> int:
 async def import_creativosur(
     session: AsyncSession, source_root: Path, storage: CreativeStorage
 ) -> dict[str, Any]:
-    source_root = source_root.resolve()
+    source_root = source_root.resolve()  # noqa: ASYNC240 - bounded worker import by design
     required = source_root / "creative_engine" / "composer.py"
     if not required.exists():
         raise ValueError("La carpeta no contiene una instalación válida de CreativoSur")

@@ -1,7 +1,8 @@
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+
+import pytest
 from pydantic import ValidationError
 
 from app.api.instanews import _serialize_dispatch
@@ -32,7 +33,7 @@ def test_social_publish_rejects_missing_story_image() -> None:
 
 @pytest.mark.asyncio
 async def test_social_dispatch_refreshes_server_updated_timestamp() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     dispatch = SimpleNamespace(
         facebook_publication_id=None,
         instagram_publication_id=None,

@@ -25,10 +25,18 @@ from app.modules.instanews.schemas import (
     InstaNewsSocialPublishRequest,
 )
 from app.modules.instanews.templates import OUTPUT_TEMPLATES, TEMPLATE_FAMILY, TEMPLATE_VERSION
+from app.modules.plugins.facebook import (
+    FacebookAPIError,
+    FacebookPublisherPlugin,
+    credentials_for_facebook_account,
+)
 from app.modules.plugins.facebook_models import FacebookAccount, FacebookPublication
+from app.modules.plugins.instagram import (
+    InstagramAPIError,
+    InstagramPublisherPlugin,
+    credentials_for_account,
+)
 from app.modules.plugins.instagram_models import InstagramAccount, InstagramPublication
-from app.modules.plugins.facebook import FacebookAPIError, FacebookPublisherPlugin, credentials_for_facebook_account
-from app.modules.plugins.instagram import InstagramAPIError, InstagramPublisherPlugin, credentials_for_account
 from app.modules.tasks.models import Task
 from app.shared.database import get_session
 
