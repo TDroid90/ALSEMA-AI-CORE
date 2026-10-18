@@ -107,10 +107,15 @@ def _cover(image_bytes: bytes, size: tuple[int, int]) -> Image.Image:
     with Image.open(BytesIO(image_bytes)) as source:
         photo = ImageOps.exif_transpose(source).convert("RGB")
         if size[1] > size[0] * 1.5 and photo.width > photo.height:
-            canvas = Image.new("RGB", size, "#07111f")
-            visible = ImageOps.contain(photo, (size[0], round(size[1] * 0.58)), Image.Resampling.LANCZOS)
-            top = max(0, (round(size[1] * 0.58) - visible.height) // 2)
-            canvas.paste(visible, ((size[0] - visible.width) // 2, top))
+            canvas = Image.new("RGB", size, "#05080f")
+            photo_height = round(size[1] * 0.84)
+            visible = ImageOps.fit(photo, (size[0], photo_height), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (1, photo_height), 255)
+            pixels = mask.load()
+            fade_start = round(size[1] * 0.54)
+            for y in range(fade_start, photo_height):
+                pixels[0, y] = round(255 * (photo_height - 1 - y) / max(1, photo_height - 1 - fade_start))
+            canvas.paste(visible, (0, 0), mask.resize((size[0], photo_height)))
             return canvas
         return ImageOps.fit(photo, size, Image.Resampling.LANCZOS)
 

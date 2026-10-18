@@ -2,7 +2,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from app.modules.instanews.renderer import render_social_asset
+from app.modules.instanews.renderer import _cover, render_social_asset
 from app.modules.instanews.templates import OUTPUT_TEMPLATES
 
 
@@ -25,20 +25,15 @@ def test_instanews_templates_render_exact_social_sizes() -> None:
         assert fit["summary_lines"] <= template["content"]["summary_lines"]
 
 
-def test_landscape_story_keeps_both_sides_of_source_photo() -> None:
-    source = Image.new("RGB", (1600, 900), "#e62c27")
-    source.paste(Image.new("RGB", (800, 900), "#1eaa5b"), (800, 0))
+def test_landscape_story_fades_photo_into_black_without_a_hard_edge() -> None:
+    source = Image.new("RGB", (1600, 900), "#ffffff")
     original = BytesIO()
     source.save(original, "PNG")
-    rendered, _ = render_social_asset(
-        original.getvalue(), "Noticia de prueba", "Bajada breve de prueba.",
-        "Municipales", OUTPUT_TEMPLATES["story"], "Río Grande",
-    )
-    with Image.open(BytesIO(rendered)) as image:
-        left = image.getpixel((120, 500))
-        right = image.getpixel((960, 500))
-        assert left[0] > left[1] * 2
-        assert right[1] > right[0] * 2
+    image = _cover(original.getvalue(), (1080, 1920))
+    brightness = [image.getpixel((540, round(1920 * fraction)))[0] for fraction in (0.50, 0.60, 0.70, 0.80, 0.90)]
+    assert brightness[0] == 255
+    assert brightness[0] > brightness[1] > brightness[2] > brightness[3] > brightness[4]
+    assert brightness[4] < 20
 
 
 def test_article_link_is_never_rendered() -> None:
